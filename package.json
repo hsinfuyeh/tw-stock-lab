@@ -1,0 +1,1 @@
+{"name":"tw-market-lab","private":true,"type":"module","scripts":{"test:ui":"node --test tests/ui.test.mjs"}}

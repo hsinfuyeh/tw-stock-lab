@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#102e3a">
+  <title>臺股研究台</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至研究結果</a>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="臺股研究台首頁">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><b>臺股研究台</b><small>TW STOCK LAB</small></span>
+    </a>
+    <div class="header-tools">
+      <label class="snapshot-picker">
+        <span>研究快照</span>
+        <select id="snapshotSelect" aria-label="選擇歷史研究快照" disabled>
+          <option>讀取中…</option>
+        </select>
+      </label>
+      <button class="button button-quiet" id="settingsButton" type="button" aria-haspopup="dialog">
+        <span aria-hidden="true">⚙</span> 研究設定
+      </button>
+      <button class="button button-primary" id="updateButton" type="button">
+        <span class="button-icon" aria-hidden="true">↻</span> 更新資料
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="cloudStatus" class="notice" hidden aria-label="雲端更新與研究範圍">
+      <strong>全上市股票與股票 ETF · 盤後每日研究</strong>
+      <p id="cloudTiming"></p><p id="coverageText"></p><p id="ageWarning" hidden></p>
+      <small>此頁顯示已發布的盤後分析；CSV匯出包含該期限全部標的，搜尋與篩選只影響畫面。</small>
+    </section>
+    <section class="hero" aria-labelledby="pageTitle">
+      <div class="hero-copy">
+        <p class="eyebrow">盤後研究 · 歷史近鄰基準</p>
+        <h1 id="pageTitle">把訊號攤開來看，<br><em>再決定下一步。</em></h1>
+        <p class="lede">比較研究清單中各標的的成本後歷史結果、樣本與風險。這裡提供決策線索，不替你下單。</p>
+      </div>
+      <div class="snapshot-card" id="snapshotCard" aria-live="polite">
+        <div class="snapshot-topline">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="snapshotStatus">正在連線本機資料服務</span>
+        </div>
+        <dl class="snapshot-facts">
+          <div><dt>共同資料日</dt><dd id="asOf">—</dd></div>
+          <div><dt>模型版本</dt><dd id="modelVersion">—</dd></div>
+          <div><dt>研究範圍</dt><dd id="universeCount">—</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="notice notice-method" aria-label="方法說明">
+      <span class="notice-icon" aria-hidden="true">i</span>
+      <p><strong>機率為尚未校準的歷史估計。</strong>它來自同標的過去相似情境，並非保證、精準預測或投資建議；綜合分只用於相對排序。</p>
+    </section>
+
+    <section class="job-panel" id="jobPanel" hidden aria-live="polite">
+      <div class="job-copy">
+        <span class="spinner" aria-hidden="true"></span>
+        <div><strong id="jobPhase">準備更新</strong><p id="jobMessage">正在檢查資料狀態…</p></div>
+        <b id="jobFraction">0 / 0</b>
+      </div>
+      <div class="progress-track"><span id="jobProgress"></span></div>
+    </section>
+
+    <section class="error-banner" id="errorBanner" hidden role="alert">
+      <div><strong>資料服務回應失敗</strong><p id="errorMessage"></p></div>
+      <button class="button button-quiet" id="retryButton" type="button">重試</button>
+    </section>
+
+    <section class="workspace" aria-labelledby="rankingTitle">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">研究排行</p>
+          <h2 id="rankingTitle">歷史情境比較</h2>
+        </div>
+        <div class="heading-actions">
+          <a class="button button-outline" id="exportLink" href="/api/export?horizon=7&amp;sort=expected_return" download>
+            <span aria-hidden="true">↓</span> 匯出 CSV
+          </a>
+        </div>
+      </div>
+
+      <div class="control-panel">
+        <fieldset class="control-group horizon-control">
+          <legend>持有期限（曆日）</legend>
+          <div class="segment" id="horizonButtons">
+            <button type="button" data-horizon="1">1<span>日</span></button>
+            <button type="button" data-horizon="3">3<span>日</span></button>
+            <button type="button" data-horizon="5">5<span>日</span></button>
+            <button type="button" data-horizon="7" class="active" aria-pressed="true">7<span>日</span></button>
+            <button type="button" data-horizon="14">14<span>日</span></button>
+            <button type="button" data-horizon="30">30<span>日</span></button>
+          </div>
+        </fieldset>
+
+        <div class="filter-row">
+          <label class="select-control"><span>搜尋代號或名稱</span><input id="searchInput" type="search" placeholder="例如 2330、台積電、00981A" autocomplete="off"></label>
+          <label class="select-control"><span>排行依據</span>
+            <select id="sortSelect">
+              <option value="expected_return">預期淨報酬</option>
+              <option value="p_positive">到期獲利比例</option>
+              <option value="p_recovery">收盤曾回正比例</option>
+              <option value="score">綜合排序分</option>
+            </select>
+          </label>
+          <label class="select-control"><span>商品類型</span>
+            <select id="kindSelect">
+              <option value="all">股票與 ETF</option>
+              <option value="stock">只看股票</option>
+              <option value="etf">只看 ETF</option>
+            </select>
+          </label>
+          <label class="select-control"><span>篩選結果</span>
+            <select id="eligibilitySelect">
+              <option value="eligible">符合門檻</option>
+              <option value="all">全部標的</option>
+              <option value="excluded">僅看排除</option>
+            </select>
+          </label>
+          <label class="check-control">
+            <input id="positiveAllCheck" type="checkbox">
+            <span class="fake-check" aria-hidden="true">✓</span>
+            <span>六個期限皆為正期望</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="results-meta">
+        <p id="resultSummary" aria-live="polite">正在讀取研究結果…</p>
+        <p class="legend"><span class="legend-dot positive"></span>正值 <span class="legend-dot negative"></span>負值／風險</p>
+      </div>
+      <div id="pagination" class="pagination" hidden><button id="previousPage" class="button button-quiet" type="button">上一頁</button><span id="pageText"></span><button id="nextPage" class="button button-quiet" type="button">下一頁</button></div>
+
+      <div class="table-shell" id="tableShell" hidden>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">順位</th>
+              <th scope="col">標的</th>
+              <th scope="col">預期淨報酬</th>
+              <th scope="col">到期獲利</th>
+              <th scope="col">曾回正</th>
+              <th scope="col">下檔 q10</th>
+              <th scope="col">樣本</th>
+              <th scope="col">資格</th>
+              <th scope="col"><span class="sr-only">查看詳情</span></th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <div class="empty-illustration" aria-hidden="true">
+          <span class="empty-grid"></span><i></i><i></i><i></i><b></b>
+        </div>
+        <p class="section-kicker">研究結果</p>
+        <h3 id="emptyTitle">從第一份盤後資料開始</h3>
+        <p id="emptyMessage">更新會從臺灣證券交易所取得研究清單的實際行情；過程與任何失敗都會顯示在這裡。</p>
+        <button class="button button-primary" id="emptyUpdateButton" type="button">開始更新</button>
+      </div>
+    </section>
+
+    <section class="notes-grid" id="snapshotNotes" hidden>
+      <article><p class="section-kicker">資料來源與複查</p><h3 id="qualityStatus">未記錄複查狀態</h3><p id="qualityTiming">—</p><p>資料品質與獲利比例分開呈現；同一上游的不同網址不算獨立驗證。</p><details><summary>查看本次來源紀錄</summary><ul id="sourceManifest"></ul></details></article>
+      <article><p class="section-kicker">方法摘要</p><h3>本次計算</h3><p id="methodologyText">—</p></article>
+      <article><p class="section-kicker">資料提醒</p><h3>限制與警示</h3><ul id="warningsList"></ul></article>
+    </section>
+  </main>
+
+  <footer>
+    <p>臺股研究台 <span>／</span> 盤後研究工具</p>
+    <p>未還原價格 · 不含息總報酬 · 不提供下單功能</p>
+  </footer>
+
+  <dialog class="drawer" id="detailDialog" aria-labelledby="detailTitle">
+    <div class="drawer-inner">
+      <div class="drawer-header">
+        <div><p class="section-kicker" id="detailKind">標的詳情</p><h2 id="detailTitle">—</h2><p id="detailSubtitle">—</p></div>
+        <button class="icon-button" data-close-dialog="detailDialog" type="button" aria-label="關閉詳情">×</button>
+      </div>
+      <div id="detailContent"></div>
+    </div>
+  </dialog>
+
+  <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+    <form id="settingsForm" method="dialog">
+      <div class="drawer-header">
+        <div><p class="section-kicker">研究參數</p><h2 id="settingsTitle">調整設定</h2><p>儲存後會用於下一次更新，不會改寫既有快照。</p></div>
+        <button class="icon-button" data-close-dialog="settingsDialog" type="button" aria-label="關閉設定">×</button>
+      </div>
+      <div class="settings-grid">
+        <label class="field field-wide"><span>研究清單 <small>以逗號或空白分隔</small></span><textarea name="symbols" rows="3" required spellcheck="false"></textarea></label>
+        <label class="field"><span>歷史月數</span><input name="months" type="number" min="3" max="120" step="1" required></label>
+        <label class="field"><span>最少樣本數</span><input name="min_samples" type="number" min="10" max="300" step="1" required></label>
+        <label class="field"><span>近鄰樣本數</span><input name="neighbors" type="number" min="10" max="300" step="1" required></label>
+        <label class="field"><span>最低日成交額（元）</span><input name="min_turnover" type="number" min="0" step="1000000" required></label>
+        <label class="field"><span>最低歷史獲利比例</span><input name="min_probability" type="number" min="0" max="1" step="0.01" required></label>
+        <label class="field"><span>最大下檔風險（%）</span><input name="max_downside" type="number" min="0" step="0.1" required></label>
+        <label class="field"><span>單邊手續費率</span><input name="fee_rate" type="number" min="0" step="0.000001" required></label>
+        <label class="field"><span>單邊滑價率</span><input name="slippage_rate" type="number" min="0" step="0.000001" required></label>
+      </div>
+      <p class="form-error" id="settingsError" hidden></p>
+      <div class="dialog-actions">
+        <button class="button button-quiet" data-close-dialog="settingsDialog" type="button">取消</button>
+        <button class="button button-primary" id="saveSettingsButton" type="submit">儲存設定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden role="status"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
