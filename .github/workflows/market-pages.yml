@@ -1,0 +1,88 @@
+name: Daily market research and Pages
+on:
+  schedule:
+    - cron: '15 11 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: market-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      PYTHONUNBUFFERED: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - name: Verify calculations and UI
+        run: |
+          python -m unittest discover -s tests -v
+          node --test tests/ui.test.mjs
+      - uses: actions/cache/restore@v4
+        id: cache
+        with:
+          path: data
+          key: market-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: market-v1-
+      - name: Recover saved public research state if cache was evicted
+        if: steps.cache.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=public-market-state&per_page=10" --jq '[.artifacts[] | select(.expired == false)][0].workflow_run.id // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --name public-market-state --dir _restore
+            python scripts/state_archive.py restore _restore/market-state.tar.gz
+          elif gh release view initial-data --json assets --jq '.assets[].name' 2>/dev/null | grep -qx market-state.tar.gz; then
+            gh release download initial-data --pattern market-state.tar.gz --dir _restore
+            python scripts/state_archive.py restore _restore/market-state.tar.gz
+          fi
+      - name: Update official data, analyze full universe, build site
+        run: python cloud_update.py --workers 2
+      - name: Save resumable data cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: market-v1-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Archive public research state
+        if: always()
+        run: python scripts/state_archive.py pack market-state.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-market-state
+          path: market-state.tar.gz
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: warn
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
