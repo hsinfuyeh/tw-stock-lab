@@ -39,6 +39,10 @@ export function paginateRows(rows, requested = 1) {
   return { rows: rows.slice(start, start + 50), page, pages, start };
 }
 
+export function updateRanking(state, changes) {
+  Object.assign(state, changes, { page: 1 });
+}
+
 export function dataURL(staticMode, route, params = {}) {
   if (!staticMode) return `/api/${route}${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`;
   const id = encodeURIComponent(params.id || '');
@@ -128,13 +132,13 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function formatDate(value, includeTime = false) {
+export function formatDate(value, includeTime = false) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return escapeHtml(value);
   return new Intl.DateTimeFormat('zh-TW', includeTime
-    ? { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
-    : { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    ? { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+    : { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
 function formatPercent(value, probability = false, digits = 1) {
@@ -297,12 +301,13 @@ function renderRows() {
   const exportParams = new URLSearchParams({ horizon: appState.horizon, sort: appState.sort });
   if (appState.snapshot?.id) exportParams.set('id', appState.snapshot.id);
   $('#exportLink').href = dataURL(STATIC_MODE, 'export', Object.fromEntries(exportParams));
+  $('#exportLink').hidden = !appState.snapshot;
 
   if (!appState.snapshot) {
     shell.hidden = true;
     empty.hidden = false;
     $('#emptyTitle').textContent = '從第一份盤後資料開始';
-    $('#emptyMessage').textContent = '更新會從臺灣證券交易所取得研究清單的實際行情；過程與任何失敗都會顯示在這裡。';
+    $('#emptyMessage').textContent = STATIC_MODE ? '目前無法顯示已發布資料。請重試讀取，或從上方「手動更新／查看進度」確認雲端狀態。' : '更新會從臺灣證券交易所取得研究清單的實際行情；過程與任何失敗都會顯示在這裡。';
     $('#emptyUpdateButton').hidden = Boolean(appState.job?.running);
     summary.textContent = '尚無可排行的研究資料';
     return;
@@ -355,6 +360,11 @@ function renderJob() {
   const ratio = total > 0 ? Math.max(0, Math.min(100, progress / total * 100)) : (job.running ? 8 : 100);
   $('#jobPhase').textContent = job.error ? '更新未完成' : job.running ? (job.phase || '更新中') : '更新完成';
   $('#jobMessage').textContent = job.error || job.message || (job.running ? '正在處理資料…' : `完成於 ${formatDate(job.finished_at, true)}`);
+  if (STATIC_MODE) {
+    const stale = dataAgeWarning(appState.history[0]?.as_of || appState.snapshot?.as_of, appState.nextSession);
+    $('#jobPhase').textContent = stale ? '資料待更新' : '已發布研究結果';
+    $('#jobMessage').textContent = `最新發布資料日 ${formatDate(appState.history[0]?.as_of || appState.snapshot?.as_of)}；此處不代表目前雲端執行狀態，請查看更新進度。`;
+  }
   $('#jobFraction').textContent = total ? `${progress} / ${total}` : job.running ? '處理中' : '完成';
   $('#jobProgress').style.width = `${ratio}%`;
   $('.spinner').hidden = !job.running;
@@ -365,7 +375,7 @@ function setUpdateButtons(running) {
   for (const button of [$('#updateButton'), $('#emptyUpdateButton')]) {
     if (!button) continue;
     button.disabled = running;
-    if (button.id === 'updateButton') button.lastChild.textContent = STATIC_MODE ? '重新讀取' : running ? ' 更新中' : ' 更新資料';
+    if (button.id === 'updateButton') button.lastChild.textContent = STATIC_MODE ? '讀取最新結果' : running ? ' 更新中' : ' 更新資料';
   }
 }
 
@@ -400,14 +410,22 @@ async function loadState({ quiet = false } = {}) {
     clearError();
     renderAll();
     schedulePoll();
+    return true;
   } catch (error) {
     showError(error.message);
     if (!appState.snapshot) renderAll();
+    return false;
   }
 }
 
 async function startUpdate() {
-  if (STATIC_MODE) { await loadState(); return; }
+  if (STATIC_MODE) {
+    setUpdateButtons(true);
+    try {
+      if (await loadState()) showToast('已讀取最新發布結果；資料日期請看「共同資料日」');
+    } finally { setUpdateButtons(false); }
+    return;
+  }
   clearError();
   setUpdateButtons(true);
   try {
@@ -580,7 +598,8 @@ async function openDetail(symbol) {
 }
 
 function bindEvents() {
-  $('#searchInput').addEventListener('input', event => { appState.query = event.target.value; appState.page = 1; renderRows(); });
+  const changeRanking = changes => { updateRanking(appState, changes); renderRows(); };
+  $('#searchInput').addEventListener('input', event => changeRanking({ query: event.target.value }));
   $('#previousPage').addEventListener('click', () => { appState.page--; renderRows(); });
   $('#nextPage').addEventListener('click', () => { appState.page++; renderRows(); });
   $('#retryButton').addEventListener('click', () => loadState());
@@ -593,6 +612,7 @@ function bindEvents() {
     const button = event.target.closest('[data-horizon]');
     if (!button) return;
     appState.horizon = button.dataset.horizon;
+    appState.page = 1;
     $$('[data-horizon]').forEach((item) => {
       const active = item === button;
       item.classList.toggle('active', active);
@@ -600,10 +620,10 @@ function bindEvents() {
     });
     renderRows();
   });
-  $('#sortSelect').addEventListener('change', (event) => { appState.sort = event.target.value; renderRows(); });
-  $('#kindSelect').addEventListener('change', (event) => { appState.kind = event.target.value; renderRows(); });
-  $('#eligibilitySelect').addEventListener('change', (event) => { appState.eligibility = event.target.value; renderRows(); });
-  $('#positiveAllCheck').addEventListener('change', (event) => { appState.positiveAll = event.target.checked; renderRows(); });
+  $('#sortSelect').addEventListener('change', event => changeRanking({ sort: event.target.value }));
+  $('#kindSelect').addEventListener('change', event => changeRanking({ kind: event.target.value }));
+  $('#eligibilitySelect').addEventListener('change', event => changeRanking({ eligibility: event.target.value }));
+  $('#positiveAllCheck').addEventListener('change', event => changeRanking({ positiveAll: event.target.checked }));
   $('#resultsBody').addEventListener('click', (event) => {
     const button = event.target.closest('[data-detail-symbol]');
     if (button) openDetail(button.dataset.detailSymbol);
@@ -620,8 +640,11 @@ function bindEvents() {
 function init() {
   if (STATIC_MODE) {
     $('#settingsButton').hidden = true;
-    $('#updateButton').textContent = '重新讀取';
-    $('#emptyUpdateButton').textContent = '重新讀取';
+    $('#cloudStatus').hidden = false;
+    $('#updateButton').textContent = '讀取最新結果';
+    $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
+    $('#emptyUpdateButton').textContent = '讀取最新結果';
+    $('#exportLink').hidden = true;
   }
   bindEvents();
   loadState();

@@ -288,6 +288,8 @@ dialog::backdrop { background: rgba(8, 25, 31, .45); backdrop-filter: blur(2px);
 
 #cloudStatus { display: block; margin: 1rem 0 2rem; padding: 1rem 1.5rem; border: 1px solid #ccd8d3; border-radius: 16px; }
 #cloudStatus p { margin: .5rem 0; }
+.cloud-actions { margin: .8rem 0; }
+#cloudStatus .update-help { font-size: .85rem; line-height: 1.7; }
 #ageWarning { color: #9d4239; font-weight: 600; }
 #searchInput { min-width: 190px; padding: .75rem; border: 1px solid #ccd8d3; border-radius: 8px; background: transparent; color: inherit; font: inherit; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem; }

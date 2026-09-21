@@ -4,7 +4,31 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader } = await import(moduleUrl);
+const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate } = await import(moduleUrl);
+
+test('changing ranking criteria returns to the first page and retains other filters', () => {
+  assert.equal(typeof updateRanking, 'function');
+  for (const changes of [{sort:'p_recovery'},{horizon:'30'},{kind:'etf'},{eligibility:'all'},{positiveAll:true},{query:'2330'}]) {
+    const state = {page:3,sort:'expected_return',horizon:'7',query:'',kind:'all'};
+    updateRanking(state, changes);
+    assert.equal(state.page, 1);
+    for (const [key, value] of Object.entries(changes)) assert.equal(state[key], value);
+    if (!('horizon' in changes)) assert.equal(state.horizon, '7');
+  }
+});
+
+test('market dates and update timestamps use Taipei time even on an overseas device', () => {
+  assert.equal(typeof formatDate, 'function');
+  const original = process.env.TZ;
+  try {
+    process.env.TZ = 'America/Los_Angeles';
+    assert.equal(formatDate('2026-09-21'), '2026/09/21');
+    assert.match(formatDate('2026-09-21T11:15:00Z', true), /2026\/09\/21.*07:15/);
+  } finally {
+    if (original === undefined) delete process.env.TZ;
+    else process.env.TZ = original;
+  }
+});
 
 test('verification label distinguishes missing evidence, legacy and one upstream', () => {
   assert.equal(typeof verificationLabel, 'function');
