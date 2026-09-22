@@ -221,8 +221,13 @@ function renderHistory() {
     select.disabled = true;
     return;
   }
+  const dates = history.map(({ as_of }) => as_of);
   select.innerHTML = history.map((entry, index) => {
-    const label = entry.as_of ? `${formatDate(entry.as_of)}${index === 0 ? ' · 最新' : ''}` : entry.id;
+    const repeated = entry.as_of && dates.indexOf(entry.as_of) !== dates.lastIndexOf(entry.as_of);
+    const time = repeated && entry.created_at
+      ? ` · ${new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(entry.created_at))}`
+      : '';
+    const label = entry.as_of ? `${formatDate(entry.as_of)}${time}${index === 0 ? ' · 最新' : ''}` : entry.id;
     return `<option value="${escapeHtml(entry.id)}">${escapeHtml(label)}</option>`;
   }).join('');
   select.disabled = false;
@@ -239,16 +244,18 @@ function renderSnapshotHeader() {
     $('#universeCount').textContent = researchSize ? `${researchSize} 檔研究清單` : '等待更新';
     return;
   }
-  $('#snapshotStatus').textContent = `快照建立於 ${formatDate(snapshot.created_at, true)}`;
+  const latest = appState.history[0];
+  $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史快照' : '快照'}建立於 ${formatDate(snapshot.created_at, true)}`;
   $('#asOf').textContent = formatDate(snapshot.as_of);
   $('#modelVersion').textContent = snapshot.model_version || '未標示';
   $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔上市股票與股票 ETF` : `${snapshot.rows?.length || 0} 檔清單`;
   const coverage = snapshot.coverage;
   $('#cloudStatus').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
-    $('#cloudTiming').textContent = `${appState.schedule}。最後檢查：${formatDate(appState.checkedAt, true)}。`;
+    $('#cloudTiming').textContent = `最近檢查：${formatDate(appState.checkedAt, true)}`;
+    $('#cloudSchedule').textContent = appState.schedule;
     $('#coverageText').textContent = coverage ? `母集合 ${coverage.stocks} 檔股票、${coverage.etfs} 檔股票 ETF；可建立當日特徵 ${coverage.analyzed_count} 檔，資料不足或不適用 ${coverage.unavailable_count} 檔（可在「僅看排除」查看）。` : '';
-    $('#ageWarning').textContent = dataAgeWarning(snapshot.as_of, appState.nextSession);
+    $('#ageWarning').textContent = dataAgeWarning(latest?.as_of || snapshot.as_of, appState.nextSession);
     $('#ageWarning').hidden = !$('#ageWarning').textContent;
   }
 }
@@ -349,6 +356,11 @@ function renderRows() {
 function renderJob() {
   const job = appState.job;
   const panel = $('#jobPanel');
+  if (STATIC_MODE) {
+    panel.hidden = true;
+    setUpdateButtons(false);
+    return;
+  }
   if (!job || (!job.running && !job.error && !job.finished_at)) {
     panel.hidden = true;
     setUpdateButtons(false);
@@ -360,11 +372,6 @@ function renderJob() {
   const ratio = total > 0 ? Math.max(0, Math.min(100, progress / total * 100)) : (job.running ? 8 : 100);
   $('#jobPhase').textContent = job.error ? '更新未完成' : job.running ? (job.phase || '更新中') : '更新完成';
   $('#jobMessage').textContent = job.error || job.message || (job.running ? '正在處理資料…' : `完成於 ${formatDate(job.finished_at, true)}`);
-  if (STATIC_MODE) {
-    const stale = dataAgeWarning(appState.history[0]?.as_of || appState.snapshot?.as_of, appState.nextSession);
-    $('#jobPhase').textContent = stale ? '資料待更新' : '已發布研究結果';
-    $('#jobMessage').textContent = `最新發布資料日 ${formatDate(appState.history[0]?.as_of || appState.snapshot?.as_of)}；此處不代表目前雲端執行狀態，請查看更新進度。`;
-  }
   $('#jobFraction').textContent = total ? `${progress} / ${total}` : job.running ? '處理中' : '完成';
   $('#jobProgress').style.width = `${ratio}%`;
   $('.spinner').hidden = !job.running;
@@ -639,6 +646,7 @@ function bindEvents() {
 
 function init() {
   if (STATIC_MODE) {
+    document.body.classList.add('static-mode');
     $('#settingsButton').hidden = true;
     $('#cloudStatus').hidden = false;
     $('#updateButton').textContent = '讀取最新結果';

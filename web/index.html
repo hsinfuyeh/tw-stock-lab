@@ -32,18 +32,24 @@
   </header>
 
   <main id="main">
-    <section id="cloudStatus" class="notice" hidden aria-label="雲端更新與研究範圍">
-      <strong>全上市股票與股票 ETF · 盤後每日研究</strong>
-      <p id="cloudTiming"></p><p id="coverageText"></p><p id="ageWarning" hidden></p>
-      <div class="cloud-actions"><a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">手動更新／查看進度 ↗</a></div>
-      <p class="update-help">每日自動抓取。「讀取最新結果」只載入已發布資料。要立即重抓，請開啟上方連結，登入有權限的 GitHub 帳號，按 Run workflow → 選 main → Run workflow；完成後回來讀取。台灣時間19:00前執行會保留前一交易日資料。</p>
-      <small>此頁顯示已發布的盤後分析；CSV匯出包含該期限全部標的，搜尋與篩選只影響畫面。</small>
+    <section id="cloudStatus" class="cloud-status" hidden aria-label="雲端更新與研究範圍">
+      <div class="cloud-status-head">
+        <div><strong>上市股票與股票 ETF · 每日盤後更新</strong><p id="cloudTiming"></p></div>
+        <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">手動更新／查看進度 ↗</a>
+      </div>
+      <p id="ageWarning" hidden></p>
+      <details class="cloud-details">
+        <summary>更新方式與資料範圍</summary>
+        <p id="cloudSchedule"></p><p id="coverageText"></p>
+        <p class="update-help">「讀取最新結果」只載入已發布資料。要重新抓取，請在 GitHub 登入有權限的帳號，按 Run workflow → 選 main → Run workflow；完成後回來讀取。台灣時間 19:00 前執行會保留前一交易日資料。</p>
+        <small>CSV 包含該期限全部標的；搜尋與篩選只影響畫面。</small>
+      </details>
     </section>
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
-        <p class="eyebrow">盤後研究 · 歷史近鄰基準</p>
-        <h1 id="pageTitle">把訊號攤開來看，<br><em>再決定下一步。</em></h1>
-        <p class="lede">比較研究清單中各標的的成本後歷史結果、樣本與風險。這裡提供決策線索，不替你下單。</p>
+        <p class="eyebrow">盤後研究 · 歷史情境</p>
+        <h1 id="pageTitle">臺股盤後<em>排行</em></h1>
+        <p class="lede">比較不同持有期限的報酬、獲利比例與風險。</p>
       </div>
       <div class="snapshot-card" id="snapshotCard" aria-live="polite">
         <div class="snapshot-topline">
@@ -60,7 +66,7 @@
 
     <section class="notice notice-method" aria-label="方法說明">
       <span class="notice-icon" aria-hidden="true">i</span>
-      <p><strong>機率為尚未校準的歷史估計。</strong>它來自同標的過去相似情境，並非保證、精準預測或投資建議；綜合分只用於相對排序。</p>
+      <p><strong>數字來自歷史相似情境，尚未校準。</strong>未來報酬與獲利機率沒有保證。</p>
     </section>
 
     <section class="job-panel" id="jobPanel" hidden aria-live="polite">
@@ -171,11 +177,14 @@
       </div>
     </section>
 
-    <section class="notes-grid" id="snapshotNotes" hidden>
+    <details class="research-details" id="snapshotNotes" hidden>
+      <summary>資料來源、計算方法與限制</summary>
+      <div class="notes-grid">
       <article><p class="section-kicker">資料來源與複查</p><h3 id="qualityStatus">未記錄複查狀態</h3><p id="qualityTiming">—</p><p>資料品質與獲利比例分開呈現；同一上游的不同網址不算獨立驗證。</p><details><summary>查看本次來源紀錄</summary><ul id="sourceManifest"></ul></details></article>
       <article><p class="section-kicker">方法摘要</p><h3>本次計算</h3><p id="methodologyText">—</p></article>
       <article><p class="section-kicker">資料提醒</p><h3>限制與警示</h3><ul id="warningsList"></ul></article>
-    </section>
+      </div>
+    </details>
   </main>
 
   <footer>

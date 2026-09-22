@@ -171,6 +171,10 @@ tbody tr:last-child td { border-bottom: 0; }
 .notes-grid p:not(.section-kicker), .notes-grid li { color: var(--ink-soft); font-size: 13px; line-height: 1.7; }
 .notes-grid ul { margin: 14px 0 0; padding-left: 18px; }
 .notes-grid li + li { margin-top: 7px; }
+.research-details { margin-top: 22px; }
+.research-details > summary { padding: 16px 20px; color: var(--teal-dark); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; font-weight: 750; cursor: pointer; }
+.research-details[open] > summary { border-radius: 12px 12px 0 0; }
+.research-details .notes-grid { margin-top: 12px; }
 
 footer { padding: 28px clamp(20px, 4vw, 64px); display: flex; justify-content: space-between; gap: 20px; color: #718083; border-top: 1px solid rgba(16,46,58,.12); font-size: 11px; letter-spacing: .04em; }
 footer p { margin: 0; }
@@ -286,14 +290,29 @@ dialog::backdrop { background: rgba(8, 25, 31, .45); backdrop-filter: blur(2px);
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
-#cloudStatus { display: block; margin: 1rem 0 2rem; padding: 1rem 1.5rem; border: 1px solid #ccd8d3; border-radius: 16px; }
-#cloudStatus p { margin: .5rem 0; }
-.cloud-actions { margin: .8rem 0; }
-#cloudStatus .update-help { font-size: .85rem; line-height: 1.7; }
+#cloudStatus { margin: 14px 0 0; padding: 13px 18px; background: rgba(255,253,247,.65); border: 1px solid #ccd8d3; border-radius: 12px; }
+.cloud-status-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cloud-status-head strong { font-size: 13px; }
+.cloud-status-head p { margin: 3px 0 0; color: var(--ink-soft); font-size: 11px; }
+.cloud-status-head .button { min-height: 36px; flex: 0 0 auto; padding: 0 10px; font-size: 11px; }
+.cloud-details { margin-top: 7px; font-size: 12px; }
+.cloud-details summary { width: fit-content; color: var(--teal-dark); font-weight: 750; cursor: pointer; }
+.cloud-details p { margin: 8px 0; color: var(--ink-soft); line-height: 1.6; }
+.cloud-details small { color: var(--ink-soft); }
 #ageWarning { color: #9d4239; font-weight: 600; }
+body.static-mode .hero { min-height: 0; padding: 24px 0; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(300px, .8fr); }
+body.static-mode h1 { font-size: clamp(32px, 4vw, 52px); }
+body.static-mode .lede { margin-top: 8px; font-size: 13px; }
+body.static-mode .snapshot-card { padding: 16px 20px; }
+body.static-mode .snapshot-facts { margin-top: 13px; grid-template-columns: 1.1fr 1fr 1.2fr; gap: 12px; }
+body.static-mode .snapshot-facts div:first-child { grid-column: auto; padding-bottom: 0; border-bottom: 0; }
+body.static-mode .snapshot-facts div:first-child dd { font: 600 17px/1.3 var(--mono); }
+body.static-mode .snapshot-facts dd { font-size: 12px; }
+body.static-mode .notice-method { padding: 10px 14px; }
+body.static-mode .workspace { margin-top: 20px; }
 #searchInput { min-width: 190px; padding: .75rem; border: 1px solid #ccd8d3; border-radius: 8px; background: transparent; color: inherit; font: inherit; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-@media(max-width:600px) { #cloudStatus {padding: 1rem;} .pagination {gap:.4rem;font-size:.8rem;} #searchInput {width:100%;min-width:0;} }
+@media(max-width:600px) { #cloudStatus {padding: 12px;} .pagination {gap:.4rem;font-size:.8rem;} #searchInput {width:100%;min-width:0;} }
 @media(max-width:700px) {
   .site-header { flex-wrap: wrap; gap: 12px; }
   .brand { flex: 0 0 100%; white-space: nowrap; }
@@ -303,4 +322,11 @@ dialog::backdrop { background: rgba(8, 25, 31, .45); backdrop-filter: blur(2px);
   .snapshot-picker select { min-width: 0; }
   h1 { font-size: clamp(30px,8.6vw,40px); line-height: 1.22; }
   .hero { padding-top: 16px; }
+  body.static-mode .hero { grid-template-columns: 1fr; gap: 14px; padding: 18px 2px; }
+  body.static-mode .snapshot-card { max-width: none; }
+  body.static-mode .snapshot-facts { grid-template-columns: 1fr 1fr; }
+  body.static-mode .snapshot-facts div:first-child { grid-column: 1 / -1; }
+  body.static-mode .snapshot-facts div:last-child { padding-top: 0; border-top: 0; }
+  .cloud-status-head { align-items: flex-start; }
+  .cloud-status-head .button { max-width: 140px; text-align: center; }
 }
