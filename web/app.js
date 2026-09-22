@@ -224,8 +224,9 @@ function renderHistory() {
   const dates = history.map(({ as_of }) => as_of);
   select.innerHTML = history.map((entry, index) => {
     const repeated = entry.as_of && dates.indexOf(entry.as_of) !== dates.lastIndexOf(entry.as_of);
-    const time = repeated && entry.created_at
-      ? ` · ${new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(entry.created_at))}`
+    const created = entry.created_at ? new Date(entry.created_at) : null;
+    const time = repeated && created && !Number.isNaN(created.getTime())
+      ? ` · 建於 ${new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(created)}`
       : '';
     const label = entry.as_of ? `${formatDate(entry.as_of)}${time}${index === 0 ? ' · 最新' : ''}` : entry.id;
     return `<option value="${escapeHtml(entry.id)}">${escapeHtml(label)}</option>`;
@@ -248,7 +249,7 @@ function renderSnapshotHeader() {
   $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史快照' : '快照'}建立於 ${formatDate(snapshot.created_at, true)}`;
   $('#asOf').textContent = formatDate(snapshot.as_of);
   $('#modelVersion').textContent = snapshot.model_version || '未標示';
-  $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔上市股票與股票 ETF` : `${snapshot.rows?.length || 0} 檔清單`;
+  $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔標的` : `${snapshot.rows?.length || 0} 檔清單`;
   const coverage = snapshot.coverage;
   $('#cloudStatus').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
