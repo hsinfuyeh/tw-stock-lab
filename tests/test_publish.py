@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from marketlab.service import MarketService
 from marketlab.data import Store
 
@@ -26,13 +27,19 @@ class PublishTests(unittest.TestCase):
             row=dict(symbol='00400A',name='測試股票ETF',kind='etf',bars=[{'date':'2026-09-18'}],horizons={str(n):h for n in [1,3,5,7,14,30]},validation={})
             snap=dict(id='safe-id',as_of='2026-09-18',created_at='2026-09-20T20:00:00+08:00',rows=[row],settings={},calendar=dict(actual=['2026-09-18'],years=[2026],holidays=[],opens=[]))
             service.store.save_snapshot(snap)
-            out=Path(root)/'dist';export(service,out)
+            expected_csv=service.export_csv(14,'p_recovery','safe-id')
+            out=Path(root)/'dist'
+            with patch.object(service.store,'snapshot',wraps=service.store.snapshot) as read_snapshot:
+                export(service,out)
+            self.assertLessEqual(read_snapshot.call_count,2,'CSV variants must reuse the loaded snapshot')
             state=json.loads((out/'data/state.json').read_text(encoding='utf-8'))
             summary=state['latest']['rows'][0]
             self.assertNotIn('bars',summary)
             self.assertNotIn('samples',summary['horizons']['14'])
             self.assertEqual(json.loads((out/summary['detail_url']).read_text(encoding='utf-8')),row)
             self.assertTrue((out/'data/csv/safe-id-14-p_recovery.csv').exists())
+            with (out/'data/csv/safe-id-14-p_recovery.csv').open(encoding='utf-8',newline='') as exported:
+                self.assertEqual(exported.read(),expected_csv)
             self.assertFalse(list(out.rglob('*.sqlite3')))
             self.assertIn('name="deployment-mode" content="static"',(out/'index.html').read_text(encoding='utf-8'))
             self.assertEqual(state['next_session'],'2026-09-21')

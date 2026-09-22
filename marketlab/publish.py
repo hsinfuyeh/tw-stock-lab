@@ -36,7 +36,7 @@ def export_site(service,output):
         for h in HORIZONS:
             for metric in ('expected_return','p_positive','p_recovery','score'):
                 path=output/f'data/csv/{identifier}-{h}-{metric}.csv';path.parent.mkdir(parents=True,exist_ok=True)
-                path.write_text(service.export_csv(h,metric,identifier),encoding='utf-8')
+                path.write_text(service.export_csv(h,metric,identifier,snapshot=snap),encoding='utf-8',newline='')
         summaries[identifier]=summary
     state=dict(latest=summaries[latest['id']],history=histories,settings=latest.get('settings',{}),universe=[],
         job=dict(running=False,phase='完成',message='雲端盤後研究已發布',finished_at=latest['created_at'],progress=len(latest['rows']),total=len(latest['rows'])),

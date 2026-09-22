@@ -300,10 +300,10 @@ class ResearchService:
         if persist: self.store.save_audit(audit)
         return audit
 
-    def export_csv(self,horizon=7,metric="expected_return",snapshot_id=None):
+    def export_csv(self,horizon=7,metric="expected_return",snapshot_id=None,*,snapshot=None):
         if horizon not in HORIZONS or metric not in ("expected_return","p_positive","p_recovery","score"):
             raise ValueError("匯出期限或排序欄位錯誤")
-        snap=self.store.snapshot(snapshot_id)
+        snap=snapshot if snapshot is not None else self.store.snapshot(snapshot_id)
         if not snap: raise ValueError("尚無研究快照")
         key=str(horizon)
         rows=sorted(snap["rows"],key=lambda r:(r["horizons"][key][metric] is not None,r["horizons"][key][metric] or 0),reverse=True)
