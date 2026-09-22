@@ -1,5 +1,6 @@
 """Build a static, credential-free Pages artifact from a committed snapshot."""
 import copy
+import hashlib
 from pathlib import Path
 import re
 import shutil
@@ -15,6 +16,9 @@ def export_site(service,output):
         if source.is_file(): shutil.copyfile(source,output/source.name)
     html=(output/'index.html').read_text(encoding='utf-8')
     html=html.replace('<head>','<head>\n  <meta name="deployment-mode" content="static">',1)
+    for asset in ('style.css','app.js'):
+        version=hashlib.sha256((output/asset).read_bytes()).hexdigest()[:12]
+        html=html.replace(f'./{asset}',f'./{asset}?v={version}',1)
     (output/'index.html').write_text(html,encoding='utf-8')
     (output/'.nojekyll').write_text('',encoding='utf-8')
     histories=service.store.history(limit=3); summaries={}

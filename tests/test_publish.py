@@ -42,6 +42,9 @@ class PublishTests(unittest.TestCase):
                 self.assertEqual(exported.read(),expected_csv)
             self.assertFalse(list(out.rglob('*.sqlite3')))
             self.assertIn('name="deployment-mode" content="static"',(out/'index.html').read_text(encoding='utf-8'))
+            html=(out/'index.html').read_text(encoding='utf-8')
+            self.assertRegex(html,r'\./style\.css\?v=[0-9a-f]{12}')
+            self.assertRegex(html,r'\./app\.js\?v=[0-9a-f]{12}')
             self.assertEqual(state['next_session'],'2026-09-21')
 
 
