@@ -43,6 +43,8 @@ def export_site(service,output):
                 path.write_text(service.export_csv(h,metric,identifier,snapshot=snap),encoding='utf-8',newline='')
         summaries[identifier]=summary
     state=dict(latest=summaries[latest['id']],history=histories,settings=latest.get('settings',{}),universe=[],
+        two_week_outcomes=[row for row in service.store.get('two_week_outcomes',[])
+                           if row['snapshot_id'] in summaries],
         job=dict(running=False,phase='完成',message='雲端盤後研究已發布',finished_at=latest['created_at'],progress=len(latest['rows']),total=len(latest['rows'])),
         checked_at=service.store.get('checked_at',now().isoformat()),schedule='每日台灣時間19:15更新，22:47補檢；完成後發布，GitHub排程可能延遲',
         next_session=target_date(latest['as_of'],1,latest.get('calendar',{})))

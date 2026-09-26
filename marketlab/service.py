@@ -13,6 +13,7 @@ from datetime import date,timedelta
 from .analytics import HORIZONS,MODEL_VERSION,ResearchModel,event_outcome
 from .data import Store,TwseClient,MarketClient,atomic_json,json_text,month_list,now
 from .quality import PIPELINE_VERSION,describe_sources,quality_label
+from .two_week import rank_candidates,outcome as two_week_outcome,VERSION as TWO_WEEK_VERSION
 
 DEFAULT_SETTINGS = dict(symbols=["2330","2317","2454","2308","2881","0050","0056","00878"],
                         months=36,min_samples=30,neighbors=60,min_turnover=20000000,min_probability=.55,
@@ -352,6 +353,13 @@ class MarketService(ResearchService):
     def settings(self):
         return dict(DEFAULT_SETTINGS,symbols=[],scope='all_listed_equity')
 
+    def state(self):
+        state=super().state()
+        visible={meta['id'] for meta in self.store.history(limit=3)}
+        state['two_week_outcomes']=[row for row in self.store.get('two_week_outcomes',[])
+                                    if row['snapshot_id'] in visible]
+        return state
+
     def compact_history(self):
         """Keep all original predictions; retain detailed diagnostics for latest three."""
         changed=False
@@ -369,6 +377,28 @@ class MarketService(ResearchService):
         if changed:
             with self.store.connect() as conn: conn.execute('VACUUM')
 
+    def reconcile_two_week(self,bundles,calendar):
+        """Mature saved daily candidates without changing the original signal."""
+        existing=self.store.get('two_week_outcomes',[])
+        known={(x['snapshot_id'],x['symbol']) for x in existing}
+        for meta in self.store.history(limit=None):
+            snap=self.store.snapshot(meta['id'])
+            archived=snap.get('two_week',{})
+            for candidate in archived.get('scored_universe',archived.get('research_candidates',[])):
+                key=(snap['id'],candidate['symbol'])
+                if key in known: continue
+                rows=bundles.get(candidate['symbol'],{}).get('rows',[])
+                index=next((i for i,row in enumerate(rows) if row['date']==snap['as_of']),None)
+                if index is None: continue
+                result=two_week_outcome(rows,index,candidate['kind'],calendar)
+                if result['status']=='pending': continue
+                existing.append(dict(snapshot_id=snap['id'],signal_date=snap['as_of'],
+                                     symbol=candidate['symbol'],kind=candidate['kind'],
+                                     etf_style=candidate.get('etf_style'),rank_fraction=candidate.get('rank_fraction'),
+                                     score=candidate.get('score'),**result))
+                known.add(key)
+        self.store.put('two_week_outcomes',existing)
+
     def _status(self,**kwargs):
         super()._status(**kwargs)
         print(kwargs.get('message',kwargs.get('phase','')),flush=True)
@@ -384,11 +414,17 @@ class MarketService(ResearchService):
         if previous and calendar['actual'][-1]<previous['as_of']:
             raise ValueError('官方資料日期倒退，保留已發布的較新快照')
         self.store.put('universe',universe)
-        bundles=client.market_bundles(universe,calendar)
+        collection={info['symbol']:info for info in universe}
+        for meta in self.store.history(limit=None):
+            old=self.store.snapshot(meta['id'])
+            archived=old.get('two_week',{})
+            for candidate in archived.get('scored_universe',archived.get('research_candidates',[])):
+                collection.setdefault(candidate['symbol'],candidate)
+        bundles=client.market_bundles(list(collection.values()),calendar)
         as_of=calendar['actual'][-1]
         # Hash content rather than fetch timestamps: a holiday refresh need not recompute.
         signature=hashlib.sha256(json_text(dict(universe=universe,calendar=calendar,settings=settings,
-            sources=[(e['url'],e['sha256']) for e in client.evidence],version=MODEL_VERSION,pipeline='market-v1')).encode()).hexdigest()
+            sources=[(e['url'],e['sha256']) for e in client.evidence],version=MODEL_VERSION,pipeline=TWO_WEEK_VERSION)).encode()).hexdigest()
         previous=self.store.snapshot()
         if previous and previous.get('data_signature')==signature:
             self.store.put('checked_at',now().isoformat())
@@ -406,8 +442,10 @@ class MarketService(ResearchService):
         unavailable=sum(bool(r['reasons']) for r in results)
         coverage=dict(universe_count=len(universe),analyzed_count=len(results)-unavailable,
             unavailable_count=unavailable,stocks=sum(r['kind']=='stock' for r in universe),etfs=sum(r['kind']=='etf' for r in universe))
+        two_week=rank_candidates([dict(info,rows=bundles[info['symbol']]['rows']) for info in universe],
+                                 as_of,self.store.get('two_week_outcomes',[]),calendar)
         snapshot=dict(id=now().strftime('%Y%m%dT%H%M%S')+'-'+uuid4().hex[:8],as_of=as_of,created_at=now().isoformat(),
-            model_version=MODEL_VERSION,data_signature=signature,scope='all_listed_equity',coverage=coverage,
+            model_version=MODEL_VERSION,data_signature=signature,scope='all_listed_equity',coverage=coverage,two_week=two_week,
             methodology='上市普通股及官方分類之股票型原型ETF；六期限按資料日起算曆日，休市順延。訊號後下一交易日開盤模擬進場，成本後未還原價格報酬；股票賣出稅0.3%、ETF0.1%，雙邊手續費0.1425%及滑價0.05%。',
             warnings=['涵蓋目前上市普通股及股票型原型ETF，含主動式與海外股票型；排除上櫃、存託憑證、債券、槓桿及反向ETF。',
                 '外幣加掛版本保留於母集合；尚未處理匯率與外幣成交金額，因此暫不納入排行。',
@@ -423,6 +461,7 @@ class MarketService(ResearchService):
         audit=self._reconcile(bundles,calendar,persist=False,evidence=[dict(snapshot_id=snapshot['id'],manifest_sha256=manifest_hash)],extra_snapshot=snapshot)
         atomic_json(self.root/'snapshots'/(snapshot['id']+'.json'),snapshot)
         self.store.save_snapshot(snapshot,audit=audit)
+        self.reconcile_two_week(bundles,calendar)
         self.compact_history()
         self.store.put('checked_at',now().isoformat())
         return snapshot

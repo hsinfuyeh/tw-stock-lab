@@ -1,6 +1,22 @@
 export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
 export const PAGE_SIZE = 15;
 
+export function twoWeekRows(report) {
+  if (report?.status === 'validated') return { label: '正式推薦', rows: (report.recommendations || []).slice(0, 10) };
+  return { label: '量價研究候選，尚未驗證', rows: (report?.research_candidates || []).slice(0, 10) };
+}
+
+export function twoWeekSummary(outcomes) {
+  const evaluated = outcomes.filter(row => row.status === 'evaluated');
+  const incomparable = outcomes.filter(row => row.status === 'not_comparable').length;
+  if (!evaluated.length && !incomparable) return '尚無期滿核對結果。';
+  return `已核對 ${evaluated.length} 筆：觸價 ${evaluated.filter(row => row.touched).length} 筆、較保守的可成交機會 ${evaluated.filter(row => row.potential_fill).length} 筆；另有 ${incomparable} 筆不可比較。`;
+}
+
+export function twoWeekOutcomesForSnapshot(outcomes,id) {
+  return (outcomes || []).filter(row => row.snapshot_id === id);
+}
+
 function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -106,6 +122,7 @@ const appState = {
   snapshot: null,
   settings: null,
   history: [],
+  twoWeekOutcomes: [],
   universe: [],
   job: null,
   horizon: '7',
@@ -287,6 +304,21 @@ function renderNotes() {
     : '<li>此快照未附額外警示；仍請依頁面方法限制解讀。</li>';
 }
 
+function renderTwoWeek() {
+  const report = appState.snapshot?.two_week;
+  const { label, rows } = twoWeekRows(report);
+  $('#twoWeekStatus').textContent = report ? label : '尚無兩週選股資料；請更新盤後資料';
+  $('#twoWeekNote').textContent = report?.note || '此快照產生於新版分析前，請選最新快照。';
+  $('#twoWeekTracking').textContent = `本日合格標的追蹤：${twoWeekSummary(twoWeekOutcomesForSnapshot(appState.twoWeekOutcomes,appState.snapshot?.id))}`;
+  $('#twoWeekBody').innerHTML = rows.map((row,index) => `<tr>
+    <td>${index+1}</td><td><b>${escapeHtml(row.symbol)}</b> · ${escapeHtml(row.name)}</td>
+    <td>${escapeHtml(kindLabel(row.kind))}</td><td>${formatPercent(row.probability,true)}</td>
+    <td>${formatDecimal(row.score,2)}</td><td>${escapeHtml((row.reasons || []).join('、') || '量價特徵')}</td>
+  </tr>`).join('');
+  $('#twoWeekTable').hidden = !rows.length;
+  $('#twoWeekEmpty').hidden = !!rows.length;
+}
+
 function renderRows() {
   detailLoader.invalidate();
   const rows = Array.isArray(appState.snapshot?.rows) ? appState.snapshot.rows : [];
@@ -395,6 +427,7 @@ function renderAll() {
   renderSnapshotHeader();
   renderHistory();
   renderJob();
+  renderTwoWeek();
   renderRows();
   renderNotes();
 }
@@ -417,6 +450,7 @@ async function loadState({ quiet = false } = {}) {
     appState.settings = payload.settings ?? appState.settings;
     appState.snapshot = payload.latest ?? null;
     appState.history = payload.history ?? [];
+    appState.twoWeekOutcomes = payload.two_week_outcomes ?? [];
     appState.job = payload.job ?? null;
     appState.universe = payload.universe ?? [];
     clearError();

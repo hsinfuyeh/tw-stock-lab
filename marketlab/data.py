@@ -257,7 +257,9 @@ def listed_universe(companies, etfs):
         if symbol in catalog: raise ValueError('ETF清單重複代號')
         listing_date=iso_date(str(row['listingDate']).replace('.','-'))
         currency=('CNY' if '人民幣' in row['stockName'] else 'USD' if '美元' in row['stockName'] else 'unknown') if symbol.endswith('K') else 'TWD'
-        catalog[symbol]=dict(symbol=symbol,name=row['stockName'],kind='etf',listing_date=listing_date,currency=currency)
+        catalog[symbol]=dict(symbol=symbol,name=row['stockName'],kind='etf',listing_date=listing_date,
+                             currency=currency,index_name=row.get('indexName'),
+                             etf_style='active' if symbol.endswith('A') or row['stockName'].startswith('主動') else 'passive')
     return sorted(catalog.values(),key=lambda r:r['symbol'])
 
 

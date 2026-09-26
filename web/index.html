@@ -55,9 +55,9 @@
     </section>
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
-        <p class="eyebrow">盤後研究 · 歷史情境</p>
-        <h1 id="pageTitle">臺股盤後<em>排行</em></h1>
-        <p class="lede">比較不同持有期限的報酬、獲利比例與風險。</p>
+        <p class="eyebrow">每日盤後 · 十個交易日</p>
+        <h1 id="pageTitle">兩週 <em>+5%</em> 候選</h1>
+        <p class="lede">依每日盤後量價重新排序，追蹤下一交易日進場後的毛價差目標。</p>
       </div>
       <div class="snapshot-card" id="snapshotCard" aria-live="polite">
         <div class="snapshot-topline">
@@ -86,6 +86,16 @@
       <button class="button button-quiet" id="retryButton" type="button">重試</button>
     </section>
 
+    <section class="workspace" aria-labelledby="twoWeekTitle">
+      <div class="section-heading"><div><p class="section-kicker">主要分析</p><h2 id="twoWeekTitle">10 個交易日內 +5% 機會</h2></div></div>
+      <p id="twoWeekStatus" aria-live="polite">載入中</p>
+      <p id="twoWeekNote"></p>
+      <p id="twoWeekTracking"></p>
+      <div class="table-shell" id="twoWeekTable" hidden><table><thead><tr><th>順位</th><th>標的</th><th>類型</th><th>組別達標率估計</th><th>量價分數</th><th>觀察訊號</th></tr></thead><tbody id="twoWeekBody"></tbody></table></div>
+      <p id="twoWeekEmpty" hidden>目前沒有符合條件的推薦或研究候選。</p>
+      <p class="research-disclaimer">觸及目標價不等於一定成交；量價候選尚非獲利機率或買進建議。每日名單會獨立保存，到期後核對。</p>
+    </section>
+    <details class="legacy-research"><summary>查看舊版六期限研究（參考資料）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">
       <div class="section-heading">
         <div>
@@ -191,6 +201,7 @@
         <button class="button button-primary" id="emptyUpdateButton" type="button">開始更新</button>
       </div>
     </section>
+    </details>
 
   </main>
 

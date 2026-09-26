@@ -321,6 +321,11 @@ body.static-mode .snapshot-facts div:first-child { grid-column: auto; padding-bo
 body.static-mode .snapshot-facts div:first-child dd { font: 600 17px/1.3 var(--mono); }
 body.static-mode .snapshot-facts dd { font-size: 12px; }
 body.static-mode .workspace { margin-top: 20px; }
+.legacy-research { margin: 18px 0 48px; }
+.legacy-research > summary { cursor: pointer; padding: 14px 18px; border: 1px solid #ccd8d3; border-radius: 10px; font-weight: 600; }
+.research-disclaimer { margin-top: 16px; color: #526763; font-size: 13px; line-height: 1.6; }
+#twoWeekStatus { font-weight: 700; }
+#twoWeekNote { color: #526763; line-height: 1.6; }
 #searchInput { min-width: 190px; padding: .75rem; border: 1px solid #ccd8d3; border-radius: 8px; background: transparent; color: inherit; font: inherit; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 #pagination { scroll-margin-top: 90px; }

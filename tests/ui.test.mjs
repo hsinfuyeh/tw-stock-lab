@@ -4,7 +4,23 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate } = await import(moduleUrl);
+const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
+
+test('two-week main ranking shows at most ten validated picks, or clearly marked research candidates', () => {
+  assert.deepEqual(twoWeekRows({ status: 'validated', recommendations: [{symbol:'A',score:3}], research_candidates: [{symbol:'B',score:9}] }),
+    {label:'正式推薦',rows:[{symbol:'A',score:3}]});
+  assert.deepEqual(twoWeekRows({ status: 'insufficient_validation', recommendations: [], research_candidates: [{symbol:'B',score:9}] }),
+    {label:'量價研究候選，尚未驗證',rows:[{symbol:'B',score:9}]});
+});
+
+test('matured two-week tracking distinguishes touched and potential fills', () => {
+  assert.equal(twoWeekSummary([{status:'evaluated',touched:true,potential_fill:false},{status:'evaluated',touched:true,potential_fill:true},{status:'not_comparable'}]),
+    '已核對 2 筆：觸價 2 筆、較保守的可成交機會 1 筆；另有 1 筆不可比較。');
+});
+
+test('tracking beside a daily list includes only that snapshot', () => {
+  assert.deepEqual(twoWeekOutcomesForSnapshot([{snapshot_id:'a'},{snapshot_id:'b'}],'b'),[{snapshot_id:'b'}]);
+});
 
 test('changing ranking criteria returns to the first page and retains other filters', () => {
   assert.equal(typeof updateRanking, 'function');
