@@ -257,8 +257,9 @@ function renderSnapshotHeader() {
     $('#cloudTiming').textContent = `最近檢查：${formatDate(appState.checkedAt, true)}`;
     $('#cloudSchedule').textContent = appState.schedule;
     $('#coverageText').textContent = coverage ? `母集合 ${coverage.stocks} 檔股票、${coverage.etfs} 檔股票 ETF；可建立當日特徵 ${coverage.analyzed_count} 檔，資料不足或不適用 ${coverage.unavailable_count} 檔（可在「僅看排除」查看）。` : '';
-    $('#ageWarning').textContent = dataAgeWarning(latest?.as_of || snapshot.as_of, appState.nextSession);
-    $('#ageWarning').hidden = !$('#ageWarning').textContent;
+    const ageWarning = dataAgeWarning(latest?.as_of || snapshot.as_of, appState.nextSession);
+    $('#ageWarningDetail').textContent = ageWarning;
+    $('#ageWarning').hidden = !ageWarning;
   }
 }
 
@@ -609,6 +610,26 @@ async function openDetail(symbol) {
 }
 
 function bindEvents() {
+  const popovers = $$('.info-popover');
+  popovers.forEach((popover) => popover.addEventListener('toggle', () => {
+    popover.classList.toggle('is-dismissed', !popover.open);
+    if (popover.open) popovers.forEach((other) => { if (other !== popover) other.open = false; });
+  }));
+  popovers.forEach((popover) => {
+    popover.addEventListener('pointerleave', () => popover.classList.remove('is-dismissed'));
+    popover.addEventListener('focusout', (event) => {
+      if (!popover.contains(event.relatedTarget)) popover.classList.remove('is-dismissed');
+    });
+  });
+  document.addEventListener('pointerdown', (event) => {
+    popovers.forEach((popover) => { if (!popover.contains(event.target)) popover.open = false; });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') popovers.forEach((popover) => {
+      popover.open = false;
+      popover.classList.add('is-dismissed');
+    });
+  });
   const changeRanking = changes => { updateRanking(appState, changes); renderRows(); };
   $('#searchInput').addEventListener('input', event => changeRanking({ query: event.target.value }));
   for (const suffix of ['', 'Bottom']) {
