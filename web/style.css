@@ -312,6 +312,8 @@ body.static-mode .notice-method { padding: 10px 14px; }
 body.static-mode .workspace { margin-top: 20px; }
 #searchInput { min-width: 190px; padding: .75rem; border: 1px solid #ccd8d3; border-radius: 8px; background: transparent; color: inherit; font: inherit; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+#pagination { scroll-margin-top: 90px; }
+.pagination-bottom { margin: 18px 0 0; }
 @media(max-width:600px) { #cloudStatus {padding: 12px;} .pagination {gap:.4rem;font-size:.8rem;} #searchInput {width:100%;min-width:0;} }
 @media(max-width:700px) {
   .site-header { flex-wrap: wrap; gap: 12px; }

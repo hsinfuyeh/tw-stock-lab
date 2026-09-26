@@ -138,11 +138,13 @@ test('search matches trimmed ticker or name, including active ETF suffix, while 
   assert.deepEqual(filterRows(rows, { query: '台積', kind: 'etf' }), []);
 });
 
-test('pagination caps each page at 50 and clamps pages after filtering', () => {
+test('pagination caps each page at 15 and clamps pages after filtering', () => {
   assert.equal(typeof paginateRows, 'function');
-  const rows = Array.from({ length: 121 }, (_, i) => i);
-  assert.deepEqual(paginateRows(rows, 2), { rows: rows.slice(50, 100), page: 2, pages: 3, start: 50 });
+  const rows = Array.from({ length: 41 }, (_, i) => i);
+  assert.deepEqual(paginateRows(rows, 2), { rows: rows.slice(15, 30), page: 2, pages: 3, start: 15 });
   assert.equal(paginateRows(rows, 99).page, 3);
+  assert.deepEqual(paginateRows(rows, 3), { rows: rows.slice(30), page: 3, pages: 3, start: 30 });
+  assert.deepEqual(paginateRows(rows.slice(0, 15), 2), { rows: rows.slice(0, 15), page: 1, pages: 1, start: 0 });
   assert.deepEqual(paginateRows([], 4), { rows: [], page: 1, pages: 1, start: 0 });
 });
 

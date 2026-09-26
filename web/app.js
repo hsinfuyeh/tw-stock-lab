@@ -1,4 +1,5 @@
 export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
+export const PAGE_SIZE = 15;
 
 function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -33,10 +34,10 @@ export function filterRows(rows, options = {}) {
 }
 
 export function paginateRows(rows, requested = 1) {
-  const pages = Math.max(1, Math.ceil(rows.length / 50));
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const page = Math.max(1, Math.min(pages, Math.trunc(requested) || 1));
-  const start = (page - 1) * 50;
-  return { rows: rows.slice(start, start + 50), page, pages, start };
+  const start = (page - 1) * PAGE_SIZE;
+  return { rows: rows.slice(start, start + PAGE_SIZE), page, pages, start };
 }
 
 export function updateRanking(state, changes) {
@@ -298,10 +299,12 @@ function renderRows() {
   const ranked = sortRows(filtered, appState.horizon, appState.sort);
   const paged = paginateRows(ranked, appState.page);
   appState.page = paged.page;
-  $('#pageText').textContent = `第 ${paged.page} / ${paged.pages} 頁 · 每頁最多50檔`;
-  $('#previousPage').disabled = paged.page <= 1;
-  $('#nextPage').disabled = paged.page >= paged.pages;
-  $('#pagination').hidden = ranked.length <= 50;
+  for (const suffix of ['', 'Bottom']) {
+    $(`#pageText${suffix}`).textContent = `第 ${paged.page} / ${paged.pages} 頁 · 每頁最多${PAGE_SIZE}檔`;
+    $(`#previousPage${suffix}`).disabled = paged.page <= 1;
+    $(`#nextPage${suffix}`).disabled = paged.page >= paged.pages;
+    $(`#pagination${suffix}`).hidden = ranked.length <= PAGE_SIZE;
+  }
   const body = $('#resultsBody');
   const shell = $('#tableShell');
   const empty = $('#emptyState');
@@ -608,8 +611,15 @@ async function openDetail(symbol) {
 function bindEvents() {
   const changeRanking = changes => { updateRanking(appState, changes); renderRows(); };
   $('#searchInput').addEventListener('input', event => changeRanking({ query: event.target.value }));
-  $('#previousPage').addEventListener('click', () => { appState.page--; renderRows(); });
-  $('#nextPage').addEventListener('click', () => { appState.page++; renderRows(); });
+  for (const suffix of ['', 'Bottom']) {
+    const changePage = delta => {
+      appState.page += delta;
+      renderRows();
+      if (suffix) $('#pagination').scrollIntoView({ block: 'start' });
+    };
+    $(`#previousPage${suffix}`).addEventListener('click', () => changePage(-1));
+    $(`#nextPage${suffix}`).addEventListener('click', () => changePage(1));
+  }
   $('#retryButton').addEventListener('click', () => loadState());
   $('#updateButton').addEventListener('click', startUpdate);
   $('#emptyUpdateButton').addEventListener('click', startUpdate);
