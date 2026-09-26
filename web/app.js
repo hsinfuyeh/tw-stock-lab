@@ -2,15 +2,15 @@ export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
 export const PAGE_SIZE = 15;
 
 export function twoWeekRows(report) {
-  if (report?.status === 'validated') return { label: '正式推薦', rows: (report.recommendations || []).slice(0, 10) };
-  return { label: '量價研究候選，尚未驗證', rows: (report?.research_candidates || []).slice(0, 10) };
+  if (report?.status === 'validated') return { label: '符合樣本外驗證門檻的觀察名單', rows: (report.recommendations || []).slice(0, 10) };
+  return { label: '量價排序觀察名單 · 樣本外驗證尚未完成', rows: (report?.research_candidates || []).slice(0, 10) };
 }
 
 export function twoWeekSummary(outcomes) {
   const evaluated = outcomes.filter(row => row.status === 'evaluated');
   const incomparable = outcomes.filter(row => row.status === 'not_comparable').length;
-  if (!evaluated.length && !incomparable) return '尚無期滿核對結果。';
-  return `已核對 ${evaluated.length} 筆：觸價 ${evaluated.filter(row => row.touched).length} 筆、較保守的可成交機會 ${evaluated.filter(row => row.potential_fill).length} 筆；另有 ${incomparable} 筆不可比較。`;
+  if (!evaluated.length && !incomparable) return '尚無觀察期滿的可核對資料。';
+  return `已核對 ${evaluated.length} 筆：其中 ${evaluated.filter(row => row.touched).length} 筆曾觸及目標價、${evaluated.filter(row => row.potential_fill).length} 筆符合保守可成交條件；另有 ${incomparable} 筆因資料或事件因素無法比較。`;
 }
 
 export function twoWeekOutcomesForSnapshot(outcomes,id) {
@@ -106,16 +106,16 @@ export function signalDatesWithLabels(signals) {
 
 export function verificationLabel(snapshot) {
   const status = snapshot?.data_quality?.verification_status;
-  if (status === 'single_source') return '單一官方來源／未完成跨來源複查';
-  if (status === 'missing_evidence') return '來源證據不足／待複查';
-  return '未記錄複查狀態';
+  if (status === 'single_source') return '單一官方來源，尚未完成獨立來源交叉驗證';
+  if (status === 'missing_evidence') return '來源佐證不足，尚待核實';
+  return '未記錄來源驗證狀態';
 }
 
 const METRICS = {
-  expected_return: '預期淨報酬',
-  p_positive: '到期獲利比例',
-  p_recovery: '收盤曾回正比例',
-  score: '綜合排序分',
+  expected_return: '樣本平均淨報酬',
+  p_positive: '樣本到期正報酬率',
+  p_recovery: '期間收盤回正率',
+  score: '綜合排序分數',
 };
 
 const appState = {
@@ -235,7 +235,7 @@ function renderHistory() {
     history.unshift({ id: latest.id, as_of: latest.as_of, created_at: latest.created_at });
   }
   if (!history.length) {
-    select.innerHTML = '<option value="">尚無快照</option>';
+    select.innerHTML = '<option value="">尚無歷史報告</option>';
     select.disabled = true;
     return;
   }
@@ -256,24 +256,24 @@ function renderHistory() {
 function renderSnapshotHeader() {
   const snapshot = appState.snapshot;
   if (!snapshot) {
-    $('#snapshotStatus').textContent = '尚無完成的研究快照';
+    $('#snapshotStatus').textContent = '尚無可供查閱的研究報告';
     $('#asOf').textContent = '—';
     $('#modelVersion').textContent = '—';
     const researchSize = Array.isArray(appState.settings?.symbols) ? appState.settings.symbols.length : 0;
-    $('#universeCount').textContent = researchSize ? `${researchSize} 檔研究清單` : '等待更新';
+    $('#universeCount').textContent = researchSize ? `${researchSize} 檔研究標的` : '尚無資料';
     return;
   }
   const latest = appState.history[0];
-  $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史快照' : '快照'}建立於 ${formatDate(snapshot.created_at, true)}`;
+  $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史報告' : '最新報告'}產製於 ${formatDate(snapshot.created_at, true)}`;
   $('#asOf').textContent = formatDate(snapshot.as_of);
   $('#modelVersion').textContent = snapshot.model_version || '未標示';
   $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔標的` : `${snapshot.rows?.length || 0} 檔清單`;
   const coverage = snapshot.coverage;
   $('#cloudStatus').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
-    $('#cloudTiming').textContent = `最近檢查：${formatDate(appState.checkedAt, true)}`;
+    $('#cloudTiming').textContent = `資料檢查時間：${formatDate(appState.checkedAt, true)}`;
     $('#cloudSchedule').textContent = appState.schedule;
-    $('#coverageText').textContent = coverage ? `母集合 ${coverage.stocks} 檔股票、${coverage.etfs} 檔股票 ETF；可建立當日特徵 ${coverage.analyzed_count} 檔，資料不足或不適用 ${coverage.unavailable_count} 檔（可在「僅看排除」查看）。` : '';
+    $('#coverageText').textContent = coverage ? `研究母體包含 ${coverage.stocks} 檔上市股票與 ${coverage.etfs} 檔股票型 ETF；其中 ${coverage.analyzed_count} 檔具備本次分析所需資料，${coverage.unavailable_count} 檔資料不足或不適用。排除原因可於下方歷史情境分析查看。` : '';
     const ageWarning = dataAgeWarning(latest?.as_of || snapshot.as_of, appState.nextSession);
     $('#ageWarningDetail').textContent = ageWarning;
     $('#ageWarning').hidden = !ageWarning;
@@ -288,32 +288,36 @@ function renderNotes() {
     return;
   }
   section.hidden = false;
-  $('#methodologyText').textContent = snapshot.methodology || '此快照未附方法摘要。';
+  $('#methodologyText').textContent = snapshot.methodology || '本次報告未附分析方法摘要。';
   $('#qualityStatus').textContent = verificationLabel(snapshot);
   const manifest = snapshot.data_quality?.source_manifest || [];
   const fetched = manifest.map((item) => item.fetched_at).filter(Boolean).sort();
   $('#qualityTiming').textContent = fetched.length
     ? `資料基準日 ${snapshot.as_of}；最後抓取 ${formatDate(fetched.at(-1), true)}。抓取時間不等於公告時間。`
-    : '此快照未附完整來源時間紀錄。';
+    : '本次報告未附完整資料取得時間紀錄。';
   $('#sourceManifest').innerHTML = manifest.length
     ? manifest.map((item) => `<li><b>${escapeHtml(item.dataset)}</b> · ${escapeHtml(item.source_family)} · ${escapeHtml(item.symbol || '市場')}<br><small>${escapeHtml(item.url)}<br>SHA256 ${escapeHtml(item.sha256 || '未記錄')}</small></li>`).join('')
-    : '<li>舊快照未補造來源或複查紀錄。</li>';
+    : '<li>此歷史報告未附來源與交叉驗證紀錄。</li>';
   const warnings = Array.isArray(snapshot.warnings) ? snapshot.warnings.filter(Boolean) : [];
   $('#warningsList').innerHTML = warnings.length
     ? warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')
-    : '<li>此快照未附額外警示；仍請依頁面方法限制解讀。</li>';
+    : '<li>本次報告無額外資料警示；分析限制仍請參閱方法說明。</li>';
 }
 
 function renderTwoWeek() {
   const report = appState.snapshot?.two_week;
   const { label, rows } = twoWeekRows(report);
-  $('#twoWeekStatus').textContent = report ? label : '尚無兩週選股資料；請更新盤後資料';
-  $('#twoWeekNote').textContent = report?.note || '此快照產生於新版分析前，請選最新快照。';
-  $('#twoWeekTracking').textContent = `本日合格標的追蹤：${twoWeekSummary(twoWeekOutcomesForSnapshot(appState.twoWeekOutcomes,appState.snapshot?.id))}`;
+  $('#twoWeekStatus').textContent = report ? label : '目前報告尚無短期動能分析資料';
+  $('#twoWeekNote').textContent = report
+    ? report.status === 'validated'
+      ? '組別達標率根據已封存的逐日訊號進行時間序列驗證，代表排序組別的歷史頻率；日線資料仍不足以確認實際成交。'
+      : '目前依價格與成交量進行相對排序。樣本外驗證與機率校準尚未完成，因此不提供個股達標機率；投資區域無法確認的 ETF 暫不納入。'
+    : '這份歷史報告產製於短期動能分析啟用前；請選取最新報告。';
+  $('#twoWeekTracking').textContent = `本資料日合格標的到期追蹤：${twoWeekSummary(twoWeekOutcomesForSnapshot(appState.twoWeekOutcomes,appState.snapshot?.id))}`;
   $('#twoWeekBody').innerHTML = rows.map((row,index) => `<tr>
     <td>${index+1}</td><td><b>${escapeHtml(row.symbol)}</b> · ${escapeHtml(row.name)}</td>
     <td>${escapeHtml(kindLabel(row.kind))}</td><td>${formatPercent(row.probability,true)}</td>
-    <td>${formatDecimal(row.score,2)}</td><td>${escapeHtml((row.reasons || []).join('、') || '量價特徵')}</td>
+    <td>${formatDecimal(row.score,2)}</td><td>${escapeHtml((row.reasons || []).join('、') || '綜合量價特徵')}</td>
   </tr>`).join('');
   $('#twoWeekTable').hidden = !rows.length;
   $('#twoWeekEmpty').hidden = !!rows.length;
@@ -350,20 +354,20 @@ function renderRows() {
   if (!appState.snapshot) {
     shell.hidden = true;
     empty.hidden = false;
-    $('#emptyTitle').textContent = '從第一份盤後資料開始';
-    $('#emptyMessage').textContent = STATIC_MODE ? '目前無法顯示已發布資料。請重試讀取，或從上方「手動更新／查看進度」確認雲端狀態。' : '更新會從臺灣證券交易所取得研究清單的實際行情；過程與任何失敗都會顯示在這裡。';
+    $('#emptyTitle').textContent = '尚無盤後分析報告';
+    $('#emptyMessage').textContent = STATIC_MODE ? '目前無法載入已發布的報告。請重新讀取，或透過上方連結查看 GitHub Actions 更新狀態。' : '執行更新後，系統會取得臺灣證券交易所行情並產製研究報告。';
     $('#emptyUpdateButton').hidden = Boolean(appState.job?.running);
-    summary.textContent = '尚無可排行的研究資料';
+    summary.textContent = '尚無可供排序的研究資料';
     return;
   }
 
   if (!ranked.length) {
     shell.hidden = true;
     empty.hidden = false;
-    $('#emptyTitle').textContent = '目前條件沒有標的';
+    $('#emptyTitle').textContent = '沒有符合目前條件的標的';
     $('#emptyMessage').textContent = rows.length
-      ? '零入選是有效結果。可切換「全部標的」或其他期限查看排除原因。'
-      : '這份快照沒有可顯示的列，請查看資料警示或重新更新。';
+      ? '可改選「全部標的」或其他觀察期限，查看各標的的排除原因。'
+      : '本次報告沒有可顯示的標的資料；請查看資料品質說明或重新執行更新。';
     $('#emptyUpdateButton').hidden = true;
     summary.innerHTML = `共 <strong>${rows.length}</strong> 檔，篩選後為 <strong>0</strong> 檔`;
     return;
@@ -379,12 +383,12 @@ function renderRows() {
     return `<tr>
       <td class="rank" data-label="順位">${String(index + paged.start + 1).padStart(2, '0')}</td>
       <td class="security-cell" data-label="標的"><div class="security"><span class="ticker-mark">${escapeHtml(kindLabel(row.kind))}</span><div><b>${escapeHtml(row.symbol)}</b><small>${escapeHtml(row.name || '未提供名稱')}</small></div></div></td>
-      <td data-label="預期淨報酬"><span class="numeric ${toneClass(expected)}">${formatPercent(expected)}</span><small class="sub-value">中位 ${formatPercent(horizon?.median_return)}</small></td>
-      <td data-label="到期獲利"><span class="numeric">${formatPercent(horizon?.p_positive, true)}</span></td>
-      <td data-label="曾回正"><span class="numeric">${formatPercent(horizon?.p_recovery, true)}</span><small class="sub-value">中位 ${finiteNumber(horizon?.median_recovery_days) === null ? '—' : `${formatDecimal(horizon.median_recovery_days, 1)} 日`}</small></td>
-      <td data-label="下檔 q10"><span class="numeric ${toneClass(horizon?.q10)}">${formatPercent(horizon?.q10)}</span><small class="sub-value">期間 ${formatPercent(horizon?.worst_close_q10)}</small></td>
-      <td data-label="樣本"><span class="numeric">${formatInteger(horizon?.n)}</span></td>
-      <td class="status-cell" data-label="資格"><span class="status-pill ${eligible ? '' : 'excluded'}">${eligible ? '符合門檻' : '排除'}</span></td>
+      <td data-label="樣本平均淨報酬"><span class="numeric ${toneClass(expected)}">${formatPercent(expected)}</span><small class="sub-value">中位數 ${formatPercent(horizon?.median_return)}</small></td>
+      <td data-label="到期正報酬率"><span class="numeric">${formatPercent(horizon?.p_positive, true)}</span></td>
+      <td data-label="期間收盤回正率"><span class="numeric">${formatPercent(horizon?.p_recovery, true)}</span><small class="sub-value">中位數 ${finiteNumber(horizon?.median_recovery_days) === null ? '—' : `${formatDecimal(horizon.median_recovery_days, 1)} 日`}</small></td>
+      <td data-label="報酬第 10 百分位"><span class="numeric ${toneClass(horizon?.q10)}">${formatPercent(horizon?.q10)}</span><small class="sub-value">期間最低收盤 ${formatPercent(horizon?.worst_close_q10)}</small></td>
+      <td data-label="樣本數"><span class="numeric">${formatInteger(horizon?.n)}</span></td>
+      <td class="status-cell" data-label="篩選結果"><span class="status-pill ${eligible ? '' : 'excluded'}">${eligible ? '符合條件' : '未納入'}</span></td>
       <td class="row-action"><button class="row-button" type="button" data-detail-symbol="${escapeHtml(row.symbol)}" aria-label="查看 ${escapeHtml(row.symbol)} 詳情">›</button></td>
     </tr>`;
   }).join('');
@@ -419,7 +423,7 @@ function setUpdateButtons(running) {
   for (const button of [$('#updateButton'), $('#emptyUpdateButton')]) {
     if (!button) continue;
     button.disabled = running;
-    if (button.id === 'updateButton') button.lastChild.textContent = STATIC_MODE ? '讀取最新結果' : running ? ' 更新中' : ' 更新資料';
+    if (button.id === 'updateButton') button.lastChild.textContent = STATIC_MODE ? '讀取最新報告' : running ? ' 更新中' : ' 執行資料更新';
   }
 }
 
@@ -468,7 +472,7 @@ async function startUpdate() {
   if (STATIC_MODE) {
     setUpdateButtons(true);
     try {
-      if (await loadState()) showToast('已讀取最新發布結果；資料日期請看「共同資料日」');
+      if (await loadState()) showToast('已載入最新發布報告；請確認資料基準日');
     } finally { setUpdateButtons(false); }
     return;
   }
@@ -619,7 +623,7 @@ async function openDetail(symbol) {
   $('#detailKind').textContent = `${kindLabel(row.kind)} · ${appState.horizon} 曆日研究`;
   $('#detailTitle').textContent = `${row.symbol} ${row.name || ''}`.trim();
   $('#detailSubtitle').textContent = `研究日 ${formatDate(row.as_of || appState.snapshot?.as_of)} · 行情日 ${formatDate(row.data_as_of || row.bars?.at(-1)?.date)} · ${row.currency || 'TWD'} · ${horizon?.target_date ? `目標交易日 ${formatDate(horizon.target_date)}` : '目標日尚未確定'}`;
-  const samplesHtml = samples.length ? `<div class="table-shell"><table class="sample-table"><thead><tr><th>訊號日</th><th>模擬進場</th><th>模擬出場</th><th>成本後報酬</th><th>曾回正</th></tr></thead><tbody>${samples.map((sample) => `<tr><td>${escapeHtml(sample.signal_date || '—')}</td><td>${escapeHtml(sample.entry_date || '—')}</td><td>${escapeHtml(sample.exit_date || '—')}</td><td class="numeric ${toneClass(sample.return_pct)}">${formatPercent(sample.return_pct)}</td><td>${sample.recovered === true ? '是' : sample.recovered === false ? '否' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="notice"><p>此期限沒有可顯示的歷史樣本日期。</p></div>';
+  const samplesHtml = samples.length ? `<div class="table-shell"><table class="sample-table"><thead><tr><th>訊號日</th><th>模擬進場日</th><th>模擬出場日</th><th>成本後報酬</th><th>期間收盤曾回正</th></tr></thead><tbody>${samples.map((sample) => `<tr><td>${escapeHtml(sample.signal_date || '—')}</td><td>${escapeHtml(sample.entry_date || '—')}</td><td>${escapeHtml(sample.exit_date || '—')}</td><td class="numeric ${toneClass(sample.return_pct)}">${formatPercent(sample.return_pct)}</td><td>${sample.recovered === true ? '是' : sample.recovered === false ? '否' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="notice"><p>此期限尚無可顯示的歷史樣本日期。</p></div>';
   const signalsHtml = signals.length
     ? signals.slice().reverse().slice(0, 12).map((signal) => `<span class="reason-chip neutral">${escapeHtml(signal.date)} · ${escapeHtml((signal.labels || []).join('、') || '訊號')}</span>`).join('')
     : '<span class="reason-chip neutral">沒有訊號標記</span>';
@@ -630,13 +634,13 @@ async function openDetail(symbol) {
   </div>` : '<div class="notice"><p>尚無此期限的時間前推檢查結果，不以 0 補值。</p></div>';
   $('#detailContent').innerHTML = `
     <div class="detail-stat-grid">
-      <div class="detail-stat"><small>預期淨報酬</small><b class="${toneClass(horizon?.expected_return)}">${formatPercent(horizon?.expected_return)}</b></div>
-      <div class="detail-stat"><small>到期獲利比例</small><b>${formatPercent(horizon?.p_positive, true)}</b></div>
-      <div class="detail-stat"><small>收盤曾回正比例</small><b>${formatPercent(horizon?.p_recovery, true)}</b></div>
-      <div class="detail-stat"><small>綜合排序分</small><b>${formatDecimal(horizon?.score, 2)}</b></div>
+      <div class="detail-stat"><small>樣本平均淨報酬</small><b class="${toneClass(horizon?.expected_return)}">${formatPercent(horizon?.expected_return)}</b></div>
+      <div class="detail-stat"><small>樣本到期正報酬率</small><b>${formatPercent(horizon?.p_positive, true)}</b></div>
+      <div class="detail-stat"><small>期間收盤回正率</small><b>${formatPercent(horizon?.p_recovery, true)}</b></div>
+      <div class="detail-stat"><small>綜合排序分數</small><b>${formatDecimal(horizon?.score, 2)}</b></div>
     </div>
     <section class="detail-section"><div class="detail-section-header"><h3>價格與成交量</h3><span>最近 ${Math.min(60, row.bars?.length || 0)} 筆 · 紅漲綠跌</span></div>${chartSvg(row.bars, signals)}</section>
-    <section class="detail-section"><div class="detail-section-header"><h3>門檻與排除依據</h3><span>期間下檔 q10 ${formatPercent(horizon?.worst_close_q10)}</span></div><div class="reason-list">${reasons.length ? reasons.map((reason) => `<span class="reason-chip">${escapeHtml(reason)}</span>`).join('') : '<span class="reason-chip neutral">此期限未列排除原因</span>'}</div></section>
+    <section class="detail-section"><div class="detail-section-header"><h3>篩選條件與排除原因</h3><span>期間最低收盤報酬第 10 百分位 ${formatPercent(horizon?.worst_close_q10)}</span></div><div class="reason-list">${reasons.length ? reasons.map((reason) => `<span class="reason-chip">${escapeHtml(reason)}</span>`).join('') : '<span class="reason-chip neutral">此期限未列排除原因</span>'}</div></section>
     <section class="detail-section"><div class="detail-section-header"><h3>近期訊號</h3><span>黃點標在 K 線圖</span></div><div class="reason-list">${signalsHtml}</div></section>
     <section class="detail-section"><div class="detail-section-header"><h3>相似歷史樣本</h3><span>共 ${formatInteger(horizon?.n)} 筆</span></div>${samplesHtml}</section>
     <section class="detail-section"><div class="detail-section-header"><h3>驗證紀錄</h3><span>比例仍屬歷史估計</span></div>${validationHtml}</section>`;
@@ -715,9 +719,9 @@ function init() {
     document.body.classList.add('static-mode');
     $('#settingsButton').hidden = true;
     $('#cloudStatus').hidden = false;
-    $('#updateButton').textContent = '讀取最新結果';
+    $('#updateButton').textContent = '讀取最新報告';
     $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
-    $('#emptyUpdateButton').textContent = '讀取最新結果';
+    $('#emptyUpdateButton').textContent = '讀取最新報告';
     $('#exportLink').hidden = true;
   }
   bindEvents();

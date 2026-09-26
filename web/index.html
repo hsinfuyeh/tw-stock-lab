@@ -17,16 +17,16 @@
     </a>
     <div class="header-tools">
       <label class="snapshot-picker">
-        <span>研究快照</span>
-        <select id="snapshotSelect" aria-label="選擇歷史研究快照" disabled>
+        <span>歷史報告</span>
+        <select id="snapshotSelect" aria-label="選擇歷史研究報告" disabled>
           <option>讀取中…</option>
         </select>
       </label>
       <button class="button button-quiet" id="settingsButton" type="button" aria-haspopup="dialog">
-        <span aria-hidden="true">⚙</span> 研究設定
+        <span aria-hidden="true">⚙</span> 分析參數
       </button>
       <button class="button button-primary" id="updateButton" type="button">
-        <span class="button-icon" aria-hidden="true">↻</span> 更新資料
+        <span class="button-icon" aria-hidden="true">↻</span> 重新整理資料
       </button>
     </div>
   </header>
@@ -34,40 +34,40 @@
   <main id="main">
     <section id="cloudStatus" class="cloud-status" hidden aria-label="雲端更新與研究範圍">
       <div class="cloud-status-head">
-        <div><strong>上市股票與股票 ETF · 每日盤後更新</strong><p id="cloudTiming"></p></div>
+        <div><strong>臺灣上市股票與股票型 ETF · 盤後更新</strong><p id="cloudTiming"></p></div>
         <div class="cloud-actions">
           <details class="info-popover cloud-details">
-            <summary>ⓘ 更新說明</summary>
+            <summary>ⓘ 資料更新說明</summary>
             <div class="info-panel">
-              <h3>更新方式與資料範圍</h3>
+              <h3>更新時程與資料涵蓋範圍</h3>
               <p id="cloudSchedule"></p><p id="coverageText"></p>
-              <p class="update-help">「讀取最新結果」只載入已發布資料。要重新抓取，請在 GitHub 登入有權限的帳號，按 Run workflow → 選 main → Run workflow；完成後回來讀取。台灣時間 19:00 前執行會保留前一交易日資料。</p>
-              <small>CSV 包含該期限全部標的；搜尋與篩選只影響畫面。</small>
+              <p class="update-help">「讀取最新報告」僅重新載入已發布的資料。如需執行資料更新，請以具備權限的 GitHub 帳號啟動工作流程（Run workflow → main → Run workflow）；流程完成後再重新載入報告。臺灣時間 19:00 前執行時，以前一交易日為資料基準日。</p>
+              <small>CSV 收錄所選期限的全部標的；頁面搜尋與篩選不影響匯出內容。</small>
             </div>
           </details>
-          <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">手動更新／查看進度 ↗</a>
+          <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">執行更新／查看進度 ↗</a>
         </div>
       </div>
       <details id="ageWarning" class="info-popover freshness-details" hidden>
-        <summary>⚠ 資料日期待確認</summary>
+        <summary>⚠ 資料時效提醒</summary>
         <div class="info-panel"><p id="ageWarningDetail"></p></div>
       </details>
     </section>
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
-        <p class="eyebrow">每日盤後 · 十個交易日</p>
-        <h1 id="pageTitle">兩週 <em>+5%</em> 候選</h1>
-        <p class="lede">依每日盤後量價重新排序，追蹤下一交易日進場後的毛價差目標。</p>
+        <p class="eyebrow">每日盤後更新 · 十個交易日觀察期</p>
+        <h1 id="pageTitle">短期動能 <em>+5%</em> 目標觀察</h1>
+        <p class="lede">依盤後價格與成交量評估相對動能，追蹤下一交易日進場後十個交易日內的價格目標。</p>
       </div>
       <div class="snapshot-card" id="snapshotCard" aria-live="polite">
         <div class="snapshot-topline">
           <span class="live-dot" aria-hidden="true"></span>
-          <span id="snapshotStatus">正在連線本機資料服務</span>
+          <span id="snapshotStatus">正在載入研究報告</span>
         </div>
         <dl class="snapshot-facts">
-          <div><dt>共同資料日</dt><dd id="asOf">—</dd></div>
-          <div><dt>模型版本</dt><dd id="modelVersion">—</dd></div>
-          <div><dt>研究範圍</dt><dd id="universeCount">—</dd></div>
+          <div><dt>資料基準日</dt><dd id="asOf">—</dd></div>
+          <div><dt>分析版本</dt><dd id="modelVersion">—</dd></div>
+          <div><dt>涵蓋標的</dt><dd id="universeCount">—</dd></div>
         </dl>
       </div>
     </section>
@@ -82,33 +82,33 @@
     </section>
 
     <section class="error-banner" id="errorBanner" hidden role="alert">
-      <div><strong>資料服務回應失敗</strong><p id="errorMessage"></p></div>
+      <div><strong>資料載入失敗</strong><p id="errorMessage"></p></div>
       <button class="button button-quiet" id="retryButton" type="button">重試</button>
     </section>
 
     <section class="workspace" aria-labelledby="twoWeekTitle">
-      <div class="section-heading"><div><p class="section-kicker">主要分析</p><h2 id="twoWeekTitle">10 個交易日內 +5% 機會</h2></div></div>
+      <div class="section-heading"><div><p class="section-kicker">短期動能觀察</p><h2 id="twoWeekTitle">十個交易日內 +5% 價格目標</h2></div></div>
       <p id="twoWeekStatus" aria-live="polite">載入中</p>
       <p id="twoWeekNote"></p>
       <p id="twoWeekTracking"></p>
-      <div class="table-shell" id="twoWeekTable" hidden><table><thead><tr><th>順位</th><th>標的</th><th>類型</th><th>組別達標率估計</th><th>量價分數</th><th>觀察訊號</th></tr></thead><tbody id="twoWeekBody"></tbody></table></div>
-      <p id="twoWeekEmpty" hidden>目前沒有符合條件的推薦或研究候選。</p>
-      <p class="research-disclaimer">觸及目標價不等於一定成交；量價候選尚非獲利機率或買進建議。每日名單會獨立保存，到期後核對。</p>
+      <div class="table-shell" id="twoWeekTable" hidden><table><thead><tr><th>排序</th><th>標的</th><th>類型</th><th>組別保守達標率估計</th><th>動能排序分數</th><th>量價觀察依據</th></tr></thead><tbody id="twoWeekBody"></tbody></table></div>
+      <p id="twoWeekEmpty" hidden>本次報告沒有符合篩選條件的標的。</p>
+      <p class="research-disclaimer">達標率如有顯示，係同類排序組別符合保守出場條件的歷史估計，並非個股預測。保守條件以日線價格高於目標價一檔判定，仍無法證明委託實際成交；名單依資料日封存並於期滿後核對。</p>
     </section>
-    <details class="legacy-research"><summary>查看舊版六期限研究（參考資料）</summary>
+    <details class="legacy-research"><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">
       <div class="section-heading">
         <div>
-          <p class="section-kicker">研究排行</p>
-          <h2 id="rankingTitle">歷史情境比較</h2>
+          <p class="section-kicker">補充分析</p>
+          <h2 id="rankingTitle">相似歷史情境比較</h2>
         </div>
         <div class="heading-actions">
           <details class="info-popover research-details" id="snapshotNotes" hidden>
-            <summary>ⓘ 研究說明</summary>
+            <summary>ⓘ 分析方法與資料品質</summary>
             <div class="info-panel">
-              <p class="essential-warning"><strong>數字來自歷史相似情境，尚未校準。</strong>未來報酬與獲利機率沒有保證。</p>
+              <p class="essential-warning"><strong>以下統計基於相似歷史樣本，尚未完成機率校準。</strong>歷史結果不代表未來報酬或實際成交結果。</p>
               <div class="notes-grid">
-                <article><p class="section-kicker">資料來源與複查</p><h3 id="qualityStatus">未記錄複查狀態</h3><p id="qualityTiming">—</p><p>資料品質與獲利比例分開呈現；同一上游的不同網址不算獨立驗證。</p><details><summary>查看本次來源紀錄</summary><ul id="sourceManifest"></ul></details></article>
+                <article><p class="section-kicker">資料來源與驗證</p><h3 id="qualityStatus">未記錄來源驗證狀態</h3><p id="qualityTiming">—</p><p>來源品質與績效統計分別評估；同一資料提供者的不同網址不構成獨立驗證。</p><details><summary>查看本次來源紀錄</summary><ul id="sourceManifest"></ul></details></article>
                 <article><p class="section-kicker">方法摘要</p><h3>本次計算</h3><p id="methodologyText">—</p></article>
                 <article><p class="section-kicker">資料提醒</p><h3>限制與警示</h3><ul id="warningsList"></ul></article>
               </div>
@@ -137,10 +137,10 @@
           <label class="select-control"><span>搜尋代號或名稱</span><input id="searchInput" type="search" placeholder="例如 2330、台積電、00981A" autocomplete="off"></label>
           <label class="select-control"><span>排行依據</span>
             <select id="sortSelect">
-              <option value="expected_return">預期淨報酬</option>
-              <option value="p_positive">到期獲利比例</option>
-              <option value="p_recovery">收盤曾回正比例</option>
-              <option value="score">綜合排序分</option>
+              <option value="expected_return">樣本平均淨報酬</option>
+              <option value="p_positive">樣本到期正報酬率</option>
+              <option value="p_recovery">期間收盤回正率</option>
+              <option value="score">綜合排序分數</option>
             </select>
           </label>
           <label class="select-control"><span>商品類型</span>
@@ -160,7 +160,7 @@
           <label class="check-control">
             <input id="positiveAllCheck" type="checkbox">
             <span class="fake-check" aria-hidden="true">✓</span>
-            <span>六個期限皆為正期望</span>
+            <span>六個期限的樣本平均報酬皆為正</span>
           </label>
         </div>
       </div>
@@ -177,12 +177,12 @@
             <tr>
               <th scope="col">順位</th>
               <th scope="col">標的</th>
-              <th scope="col">預期淨報酬</th>
-              <th scope="col">到期獲利</th>
-              <th scope="col">曾回正</th>
-              <th scope="col">下檔 q10</th>
-              <th scope="col">樣本</th>
-              <th scope="col">資格</th>
+              <th scope="col">樣本平均淨報酬</th>
+              <th scope="col">到期正報酬率</th>
+              <th scope="col">期間收盤回正率</th>
+              <th scope="col">報酬第 10 百分位</th>
+              <th scope="col">樣本數</th>
+              <th scope="col">篩選結果</th>
               <th scope="col"><span class="sr-only">查看詳情</span></th>
             </tr>
           </thead>
@@ -196,9 +196,9 @@
           <span class="empty-grid"></span><i></i><i></i><i></i><b></b>
         </div>
         <p class="section-kicker">研究結果</p>
-        <h3 id="emptyTitle">從第一份盤後資料開始</h3>
-        <p id="emptyMessage">更新會從臺灣證券交易所取得研究清單的實際行情；過程與任何失敗都會顯示在這裡。</p>
-        <button class="button button-primary" id="emptyUpdateButton" type="button">開始更新</button>
+        <h3 id="emptyTitle">尚無盤後分析報告</h3>
+        <p id="emptyMessage">執行更新後，系統會取得臺灣證券交易所行情並產製研究報告。</p>
+        <button class="button button-primary" id="emptyUpdateButton" type="button">執行資料更新</button>
       </div>
     </section>
     </details>
@@ -207,7 +207,7 @@
 
   <footer>
     <p>臺股研究台 <span>／</span> 盤後研究工具</p>
-    <p>未還原價格 · 不含息總報酬 · 不提供下單功能</p>
+    <p>短期目標僅計未還原價格變動 · 歷史情境分析另計交易成本 · 不提供下單功能</p>
   </footer>
 
   <dialog class="drawer" id="detailDialog" aria-labelledby="detailTitle">
@@ -223,7 +223,7 @@
   <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
     <form id="settingsForm" method="dialog">
       <div class="drawer-header">
-        <div><p class="section-kicker">研究參數</p><h2 id="settingsTitle">調整設定</h2><p>儲存後會用於下一次更新，不會改寫既有快照。</p></div>
+        <div><p class="section-kicker">研究參數</p><h2 id="settingsTitle">調整分析參數</h2><p>新設定自下次更新起生效，不變更已封存的研究報告。</p></div>
         <button class="icon-button" data-close-dialog="settingsDialog" type="button" aria-label="關閉設定">×</button>
       </div>
       <div class="settings-grid">
@@ -232,7 +232,7 @@
         <label class="field"><span>最少樣本數</span><input name="min_samples" type="number" min="10" max="300" step="1" required></label>
         <label class="field"><span>近鄰樣本數</span><input name="neighbors" type="number" min="10" max="300" step="1" required></label>
         <label class="field"><span>最低日成交額（元）</span><input name="min_turnover" type="number" min="0" step="1000000" required></label>
-        <label class="field"><span>最低歷史獲利比例</span><input name="min_probability" type="number" min="0" max="1" step="0.01" required></label>
+        <label class="field"><span>最低樣本正報酬率</span><input name="min_probability" type="number" min="0" max="1" step="0.01" required></label>
         <label class="field"><span>最大下檔風險（%）</span><input name="max_downside" type="number" min="0" step="0.1" required></label>
         <label class="field"><span>單邊手續費率</span><input name="fee_rate" type="number" min="0" step="0.000001" required></label>
         <label class="field"><span>單邊滑價率</span><input name="slippage_rate" type="number" min="0" step="0.000001" required></label>

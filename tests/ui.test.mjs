@@ -8,14 +8,14 @@ const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginate
 
 test('two-week main ranking shows at most ten validated picks, or clearly marked research candidates', () => {
   assert.deepEqual(twoWeekRows({ status: 'validated', recommendations: [{symbol:'A',score:3}], research_candidates: [{symbol:'B',score:9}] }),
-    {label:'正式推薦',rows:[{symbol:'A',score:3}]});
+    {label:'符合樣本外驗證門檻的觀察名單',rows:[{symbol:'A',score:3}]});
   assert.deepEqual(twoWeekRows({ status: 'insufficient_validation', recommendations: [], research_candidates: [{symbol:'B',score:9}] }),
-    {label:'量價研究候選，尚未驗證',rows:[{symbol:'B',score:9}]});
+    {label:'量價排序觀察名單 · 樣本外驗證尚未完成',rows:[{symbol:'B',score:9}]});
 });
 
 test('matured two-week tracking distinguishes touched and potential fills', () => {
   assert.equal(twoWeekSummary([{status:'evaluated',touched:true,potential_fill:false},{status:'evaluated',touched:true,potential_fill:true},{status:'not_comparable'}]),
-    '已核對 2 筆：觸價 2 筆、較保守的可成交機會 1 筆；另有 1 筆不可比較。');
+    '已核對 2 筆：其中 2 筆曾觸及目標價、1 筆符合保守可成交條件；另有 1 筆因資料或事件因素無法比較。');
 });
 
 test('tracking beside a daily list includes only that snapshot', () => {
@@ -49,8 +49,8 @@ test('market dates and update timestamps use Taipei time even on an overseas dev
 test('verification label distinguishes missing evidence, legacy and one upstream', () => {
   assert.equal(typeof verificationLabel, 'function');
   assert.match(verificationLabel({}), /未記錄/);
-  assert.match(verificationLabel({ data_quality: { verification_status: 'missing_evidence' } }), /證據不足/);
-  assert.match(verificationLabel({ data_quality: { verification_status: 'single_source', source_families: ['TWSE'] } }), /未完成跨來源/);
+  assert.match(verificationLabel({ data_quality: { verification_status: 'missing_evidence' } }), /佐證不足/);
+  assert.match(verificationLabel({ data_quality: { verification_status: 'single_source', source_families: ['TWSE'] } }), /尚未完成獨立來源交叉驗證/);
   assert.match(verificationLabel({ data_quality: { verification_status: 'unknown_future_status' } }), /未記錄/);
 });
 

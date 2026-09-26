@@ -45,8 +45,8 @@ def export_site(service,output):
     state=dict(latest=summaries[latest['id']],history=histories,settings=latest.get('settings',{}),universe=[],
         two_week_outcomes=[row for row in service.store.get('two_week_outcomes',[])
                            if row['snapshot_id'] in summaries],
-        job=dict(running=False,phase='完成',message='雲端盤後研究已發布',finished_at=latest['created_at'],progress=len(latest['rows']),total=len(latest['rows'])),
-        checked_at=service.store.get('checked_at',now().isoformat()),schedule='每日台灣時間19:15更新，22:47補檢；完成後發布，GitHub排程可能延遲',
+        job=dict(running=False,phase='已完成',message='盤後分析報告已發布',finished_at=latest['created_at'],progress=len(latest['rows']),total=len(latest['rows'])),
+        checked_at=service.store.get('checked_at',now().isoformat()),schedule='每日臺灣時間 19:15 執行資料更新，22:47 補檢；分析完成後發布。GitHub 排程可能延遲。',
         next_session=target_date(latest['as_of'],1,latest.get('calendar',{})))
     atomic_json(output/'data/state.json',state)
     return dict(as_of=latest['as_of'],count=len(latest['rows']),files=sum(p.is_file() for p in output.rglob('*')))
