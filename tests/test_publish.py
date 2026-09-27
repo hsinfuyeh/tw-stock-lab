@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import patch
 from marketlab.service import MarketService
 from marketlab.data import Store
+from marketlab.analytics import features_at
+from test_analytics import bars, cal
 
 
 class PublishTests(unittest.TestCase):
@@ -54,6 +56,31 @@ class PublishTests(unittest.TestCase):
             self.assertRegex(html,r'\./style\.css\?v=[0-9a-f]{12}')
             self.assertRegex(html,r'\./app\.js\?v=[0-9a-f]{12}')
             self.assertEqual(state['next_session'],'2026-09-21')
+
+    def test_homepage_enriches_old_archived_candidates_from_same_day_bars(self):
+        with tempfile.TemporaryDirectory() as root:
+            service=MarketService(Path(root)/'data')
+            price_rows=bars(40,start='2026-08-01')
+            feature=features_at(price_rows,len(price_rows)-1,cal(price_rows))
+            h=dict(target_date=None,expected_return=None,p_positive=None,p_recovery=None,
+                   q10=None,q90=None,n=0,eligible=False,reasons=[],score=None)
+            candidate=dict(symbol='2330',name='測試股票',kind='stock',score=12,reasons=[])
+            snap=dict(id='old-snapshot',as_of=price_rows[-1]['date'],created_at='2026-09-27T20:00:00+08:00',
+                rows=[dict(symbol='2330',name='測試股票',kind='stock',bars=price_rows,features=feature,
+                           horizons={str(n):h for n in [1,3,5,7,14,30]})],calendar=cal(price_rows),
+                two_week=dict(status='insufficient_validation',research_candidates=[candidate],
+                              recommendations=[],scored_universe=[candidate]))
+            service.store.save_snapshot(snap)
+            out=Path(root)/'dist'
+            self.publish()(service,out)
+            home=json.loads((out/'data/home.json').read_text(encoding='utf-8'))
+            row=home['latest']['two_week']['research_candidates'][0]
+            self.assertEqual(row['close'],price_rows[-1]['close'])
+            self.assertEqual(len(row['trend']),20)
+            self.assertEqual(row['trend'][-1],dict(date=price_rows[-1]['date'],close=price_rows[-1]['close']))
+            self.assertAlmostEqual(row['momentum5_pct'],feature['momentum5'],places=2)
+            self.assertAlmostEqual(row['relative_volume'],feature['volume_ratio'],places=2)
+            self.assertNotIn('close',snap['two_week']['research_candidates'][0], 'archived snapshot must stay unchanged')
 
 
 if __name__=='__main__': unittest.main()

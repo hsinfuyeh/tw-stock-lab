@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 import re
 import shutil
-from .analytics import HORIZONS,target_date
+from .analytics import HORIZONS,target_date,features_at
 from .data import atomic_json,now
 
 
@@ -50,9 +50,23 @@ def export_site(service,output):
         next_session=target_date(latest['as_of'],1,latest.get('calendar',{})))
     atomic_json(output/'data/state.json',state)
     report=latest.get('two_week') or {}
+    home_report={key:copy.deepcopy(report[key]) for key in ('status','recommendations','research_candidates') if key in report}
+    rows_by_symbol={row['symbol']:row for row in latest['rows']}
+    for listing in ('recommendations','research_candidates'):
+        for candidate in home_report.get(listing,[]):
+            row=rows_by_symbol.get(candidate['symbol'])
+            bars=row.get('bars') if row else None
+            if not bars or len(bars)<21 or bars[-1].get('date')!=latest['as_of']: continue
+            feature=row.get('features') or features_at(bars,len(bars)-1,latest.get('calendar'))
+            if not feature: continue
+            candidate.setdefault('close',bars[-1]['close'])
+            candidate.setdefault('momentum5_pct',round(feature['momentum5'],2))
+            candidate.setdefault('momentum20_pct',round(feature['momentum20'],2))
+            candidate.setdefault('relative_volume',round(feature['volume_ratio'],2))
+            candidate.setdefault('trend',[dict(date=bar['date'],close=bar['close']) for bar in bars[-20:]])
     home=dict(latest=dict(id=latest['id'],as_of=latest['as_of'],created_at=latest['created_at'],
         coverage=latest.get('coverage'),
-        two_week={key:copy.deepcopy(report[key]) for key in ('status','recommendations','research_candidates') if key in report}),
+        two_week=home_report),
         history=histories[:1],checked_at=state['checked_at'],next_session=state['next_session'],
         two_week_outcomes=[row for row in state['two_week_outcomes'] if row['snapshot_id']==latest['id']])
     atomic_json(output/'data/home.json',home)
