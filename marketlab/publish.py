@@ -49,4 +49,11 @@ def export_site(service,output):
         checked_at=service.store.get('checked_at',now().isoformat()),schedule='每日臺灣時間 19:15 執行資料更新，22:47 補檢；分析完成後發布。GitHub 排程可能延遲。',
         next_session=target_date(latest['as_of'],1,latest.get('calendar',{})))
     atomic_json(output/'data/state.json',state)
+    report=latest.get('two_week') or {}
+    home=dict(latest=dict(id=latest['id'],as_of=latest['as_of'],created_at=latest['created_at'],
+        coverage=latest.get('coverage'),
+        two_week={key:copy.deepcopy(report[key]) for key in ('status','recommendations','research_candidates') if key in report}),
+        history=histories[:1],checked_at=state['checked_at'],next_session=state['next_session'],
+        two_week_outcomes=[row for row in state['two_week_outcomes'] if row['snapshot_id']==latest['id']])
+    atomic_json(output/'data/home.json',home)
     return dict(as_of=latest['as_of'],count=len(latest['rows']),files=sum(p.is_file() for p in output.rglob('*')))

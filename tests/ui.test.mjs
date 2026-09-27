@@ -27,7 +27,7 @@ test('unvalidated ranking omits unavailable probability and labels every mobile 
   assert.doesNotMatch(markup, /組別保守達標率估計/);
   assert.match(markup, /data-label="排序"/);
   assert.match(markup, /data-label="標的"/);
-  assert.match(markup, /data-label="類型"/);
+  assert.match(markup, /class="asset-badge">股票/);
   assert.match(markup, /data-label="量價訊號"/);
   assert.match(markup, /相對強勢/);
   assert.match(markup, /成交量擴大/);
@@ -41,6 +41,30 @@ test('validated ranking identifies group rate as an estimate', () => {
   ]});
   assert.match(markup, /組別保守達標率估計/);
   assert.match(markup, /data-label="組別保守達標率估計">43\.0%/);
+});
+
+test('candidate row shows historical market metrics and an accessible closing-price trend', () => {
+  const trend = Array.from({length:20}, (_, index) => ({date:`2026-09-${String(index+1).padStart(2,'0')}`,close:100+index}));
+  const markup = twoWeekTableMarkup({status:'insufficient_validation',research_candidates:[
+    {symbol:'2330',name:'台積電',kind:'stock',score:10,close:119,momentum5_pct:3.25,
+      momentum20_pct:19,relative_volume:1.8,trend,reasons:[]},
+  ]});
+  assert.match(markup, /盤後收盤價/);
+  assert.match(markup, /近 5 日/);
+  assert.match(markup, /近 20 日/);
+  assert.match(markup, /相對量能/);
+  assert.match(markup, /1\.80 倍/);
+  assert.match(markup, /<svg[^>]+role="img"[^>]+aria-label="近 20 交易日收盤走勢：2026-09-01 至 2026-09-20"/);
+  assert.match(markup, /119\.00/);
+  assert.doesNotMatch(markup, /預測漲幅/);
+});
+
+test('candidate row handles an older snapshot without trend metrics', () => {
+  const markup = twoWeekTableMarkup({status:'insufficient_validation',research_candidates:[
+    {symbol:'2330',name:'台積電',kind:'stock',score:10,reasons:[]},
+  ]});
+  assert.match(markup, /資料不足/);
+  assert.doesNotMatch(markup, /NaN|undefined|<svg/);
 });
 
 test('tracking beside a daily list includes only that snapshot', () => {
@@ -191,7 +215,7 @@ test('pagination caps each page at 15 and clamps pages after filtering', () => {
 
 test('static data and CSV routes remain inside the project subpath; local API routes remain available', () => {
   assert.equal(typeof dataURL, 'function');
-  assert.equal(new URL(dataURL(true, 'state'), 'https://example.github.io/tw-stock-lab/').pathname, '/tw-stock-lab/data/state.json');
+  assert.equal(new URL(dataURL(true, 'state'), 'https://example.github.io/tw-stock-lab/').pathname, '/tw-stock-lab/data/home.json');
   assert.equal(dataURL(true, 'snapshot', { id: 'snap1' }), './data/snapshots/snap1.json');
   assert.equal(dataURL(true, 'export', { id: 'snap1', horizon: '14', sort: 'score' }), './data/csv/snap1-14-score.csv');
   assert.equal(dataURL(false, 'state'), '/api/state');

@@ -119,7 +119,12 @@ def rank_candidates(symbols, as_of, history, calendar):
             market20=(new/old-1)*100 if old and new else 0
             breakout=2 if "突破前20日高點" in feature["labels"] else 0
             candidates.append(dict(symbol=item["symbol"],name=item.get("name",item["symbol"]),
-                kind=item["kind"],etf_style=item.get("etf_style"),score=round(feature["momentum5"]+feature["momentum20"]
+                kind=item["kind"],etf_style=item.get("etf_style"),
+                close=rows[-1]["close"],momentum5_pct=round(feature["momentum5"],2),
+                momentum20_pct=round(feature["momentum20"],2),
+                relative_volume=round(feature["volume_ratio"],2),
+                trend=[dict(date=row["date"],close=row["close"]) for row in rows[-20:]],
+                score=round(feature["momentum5"]+feature["momentum20"]
                 -market20+min(feature["volume_ratio"],3)*2+breakout-feature["volatility"],2),
                 reasons=feature["labels"],probability=None))
     candidates.sort(key=lambda r:(-r["score"],r["symbol"]))

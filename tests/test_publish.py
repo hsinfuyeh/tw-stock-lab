@@ -25,7 +25,9 @@ class PublishTests(unittest.TestCase):
             service=MarketService(Path(root)/'data')
             h=dict(target_date='2026-10-02',expected_return=2.,p_positive=.6,p_recovery=.8,q10=-2.,q90=5.,n=40,eligible=True,reasons=[],score=60,samples=[{'signal_date':'2025-01-01'}])
             row=dict(symbol='00400A',name='測試股票ETF',kind='etf',bars=[{'date':'2026-09-18'}],horizons={str(n):h for n in [1,3,5,7,14,30]},validation={})
-            snap=dict(id='safe-id',as_of='2026-09-18',created_at='2026-09-20T20:00:00+08:00',rows=[row],settings={},calendar=dict(actual=['2026-09-18'],years=[2026],holidays=[],opens=[]))
+            snap=dict(id='safe-id',as_of='2026-09-18',created_at='2026-09-20T20:00:00+08:00',rows=[row],settings={},calendar=dict(actual=['2026-09-18'],years=[2026],holidays=[],opens=[]),
+                two_week=dict(status='insufficient_validation',research_candidates=[dict(symbol='00400A',name='測試股票ETF',score=12)],
+                              recommendations=[],scored_universe=[dict(symbol='00400A',score=12)],validation=dict(stock=dict(status='insufficient_validation'))))
             service.store.save_snapshot(snap)
             expected_csv=service.export_csv(14,'p_recovery','safe-id')
             out=Path(root)/'dist'
@@ -33,6 +35,12 @@ class PublishTests(unittest.TestCase):
                 export(service,out)
             self.assertLessEqual(read_snapshot.call_count,2,'CSV variants must reuse the loaded snapshot')
             state=json.loads((out/'data/state.json').read_text(encoding='utf-8'))
+            home=json.loads((out/'data/home.json').read_text(encoding='utf-8'))
+            self.assertEqual(home['latest']['two_week']['research_candidates'][0]['symbol'],'00400A')
+            self.assertNotIn('rows',home['latest'])
+            self.assertNotIn('scored_universe',home['latest']['two_week'])
+            self.assertNotIn('validation',home['latest']['two_week'])
+            self.assertLess((out/'data/home.json').stat().st_size,(out/'data/state.json').stat().st_size)
             summary=state['latest']['rows'][0]
             self.assertNotIn('bars',summary)
             self.assertNotIn('samples',summary['horizons']['14'])

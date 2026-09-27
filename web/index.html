@@ -15,10 +15,9 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span><b>臺股研究台</b><small>TW STOCK LAB</small></span>
     </a>
-    <nav class="header-tools" aria-label="頁面導覽">
-      <a href="#twoWeekTitle">觀察名單</a>
-      <a href="#researchMethods">研究方法</a>
-    </nav>
+    <div class="header-tools">
+      <button class="button button-outline" id="updateButton" type="button" title="重新讀取已發布的盤後報告；不會啟動資料抓取"><span class="button-icon" aria-hidden="true">↻</span><span class="button-label">重新讀取</span></button>
+    </div>
   </header>
 
   <main id="main">
@@ -66,12 +65,13 @@
         <summary>研究方法、到期追蹤與風險說明</summary>
         <div class="method-body">
           <p id="twoWeekNote"></p>
+          <p>名單數值與迷你圖皆截至資料基準日收盤。近 5 日、近 20 日是歷史價格變動；相對量能為當日成交量除以前 20 個交易日平均成交量。走勢圖只顯示近 20 個交易日收盤價。</p>
           <p id="twoWeekTracking"></p>
           <p>達標率如有顯示，係同類排序組別符合保守出場條件的歷史估計，並非個股預測。保守條件以日線價格高於目標價一檔判定，仍無法證明委託實際成交；名單依資料日封存並於期滿後核對。</p>
         </div>
       </details>
     </section>
-    <details class="legacy-research"><summary>展開歷史情境分析（六種曆日期限）</summary>
+    <details class="legacy-research" hidden><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">
       <div class="section-heading">
         <div>
@@ -179,7 +179,7 @@
     </section>
     </details>
 
-    <details id="cloudStatus" class="maintenance-details">
+    <details id="cloudStatus" class="maintenance-details" hidden>
       <summary>資料與維護資訊</summary>
       <div class="maintenance-body">
         <p>臺灣上市股票與股票型 ETF · 盤後更新</p>
@@ -188,7 +188,6 @@
         <dl class="maintenance-facts"><div><dt>涵蓋標的</dt><dd id="universeCount">—</dd></div></dl>
         <p>「讀取最新報告」僅重新載入已發布的資料。如需執行資料更新，請以具備權限的 GitHub 帳號啟動工作流程（Run workflow → main → Run workflow）；流程完成後再重新載入報告。臺灣時間 19:00 前執行時，以前一交易日為資料基準日。</p>
         <div class="maintenance-actions">
-          <button class="button button-quiet" id="updateButton" type="button"><span class="button-icon" aria-hidden="true">↻</span> 重新整理資料</button>
           <button class="button button-quiet" id="settingsButton" type="button" aria-haspopup="dialog"><span aria-hidden="true">⚙</span> 分析參數</button>
           <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">執行更新／查看進度 ↗</a>
         </div>
@@ -200,7 +199,7 @@
 
   <footer>
     <p>臺股研究台 <span>／</span> 盤後研究工具</p>
-    <p>短期目標僅計未還原價格變動 · 歷史情境分析另計交易成本 · 不提供下單功能</p>
+    <p>短期目標僅計未還原價格變動 · 每日盤後更新 · 不提供下單功能</p>
   </footer>
 
   <dialog class="drawer" id="detailDialog" aria-labelledby="detailTitle">

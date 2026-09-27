@@ -99,6 +99,19 @@ class TwoWeekTests(unittest.TestCase):
         two=rank_candidates([item],rows[-1]["date"],[],rising)["research_candidates"][0]["score"]
         self.assertGreater(one,two)
 
+    def test_candidate_carries_only_known_close_momentum_volume_and_trend(self):
+        rows=bars(40)
+        for row in rows: row["turnover"]=30_000_000
+        candidate=rank_candidates([dict(symbol="2330",name="甲",kind="stock",rows=rows)],
+                                  rows[-1]["date"],[],cal(rows))["research_candidates"][0]
+        self.assertEqual(candidate["close"],rows[-1]["close"])
+        self.assertEqual(len(candidate["trend"]),20)
+        self.assertEqual(candidate["trend"][0],dict(date=rows[-20]["date"],close=rows[-20]["close"]))
+        self.assertEqual(candidate["trend"][-1],dict(date=rows[-1]["date"],close=rows[-1]["close"]))
+        self.assertAlmostEqual(candidate["momentum5_pct"],(rows[-1]["close"]/rows[-6]["close"]-1)*100,places=2)
+        self.assertAlmostEqual(candidate["momentum20_pct"],(rows[-1]["close"]/rows[-21]["close"]-1)*100,places=2)
+        self.assertGreater(candidate["relative_volume"],0)
+
     def test_rank_fraction_is_computed_within_stock_and_etf_groups(self):
         rows=bars(40)
         for row in rows: row["turnover"]=30_000_000

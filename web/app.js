@@ -6,22 +6,46 @@ export function twoWeekRows(report) {
   return { label: '量價排序觀察名單 · 樣本外驗證尚未完成', rows: (report?.research_candidates || []).slice(0, 10) };
 }
 
+function trendMarkup(trend) {
+  const points = Array.isArray(trend) ? trend.slice(-20).filter((point) => finiteNumber(point?.close) !== null && point?.date) : [];
+  if (points.length < 2) return '<span class="trend-empty">資料不足</span>';
+  const values = points.map((point) => point.close);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const span = high - low;
+  const coordinates = values.map((value, index) => {
+    const x = 2 + index * 128 / (values.length - 1);
+    const y = span ? 34 - (value - low) * 30 / span : 19;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const direction = values.at(-1) >= values[0] ? 'up' : 'down';
+  const label = `近 ${points.length} 交易日收盤走勢：${points[0].date} 至 ${points.at(-1).date}`;
+  return `<svg class="sparkline sparkline-${direction}" viewBox="0 0 132 38" role="img" aria-label="${escapeHtml(label)}" preserveAspectRatio="none"><polyline points="${coordinates.join(' ')}" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
 export function twoWeekTableMarkup(report) {
   const { rows } = twoWeekRows(report);
   const showRate = report?.status === 'validated';
   return `<table class="two-week-results"><thead><tr>
-    <th scope="col">排序</th><th scope="col">標的</th><th scope="col">類型</th>
-    <th scope="col">量價訊號</th>${showRate ? '<th scope="col">組別保守達標率估計</th>' : ''}
+    <th scope="col">排序</th><th scope="col">標的</th><th scope="col">盤後收盤價</th>
+    <th scope="col">近 5 日</th><th scope="col">近 20 日</th><th scope="col">相對量能</th>
+    <th scope="col">近 20 交易日收盤走勢</th><th scope="col">量價訊號</th>${showRate ? '<th scope="col">組別保守達標率估計</th>' : ''}
   </tr></thead><tbody>${rows.map((row, index) => {
     const reasons = [...new Set((Array.isArray(row.reasons) ? row.reasons : []).filter(Boolean))];
     const tags = reasons.slice(0, 2).map((reason) => `<span class="signal-tag">${escapeHtml(reason)}</span>`).join('')
       || '<span class="signal-quiet">依綜合量價條件排序</span>';
     const allReasons = reasons.length ? reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')
       : '<li>本日未觸發單項量價標記；排序仍綜合相對動能、成交量及波動等因素。</li>';
+    const metric = (value) => finiteNumber(value) === null ? '—' : formatPercent(value);
+    const metricClass = (value) => finiteNumber(value) === null ? '' : value >= 0 ? ' positive' : ' negative';
     return `<tr>
       <td class="rank" data-label="排序">${index + 1}</td>
-      <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="mobile-asset-type">${escapeHtml(kindLabel(row.kind))}</small></div></td>
-      <td class="asset-type" data-label="類型">${escapeHtml(kindLabel(row.kind))}</td>
+      <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${escapeHtml(kindLabel(row.kind))}</small></div></td>
+      <td class="close-cell" data-label="盤後收盤價">${formatDecimal(row.close, 2)}</td>
+      <td class="metric-cell${metricClass(row.momentum5_pct)}" data-label="近 5 日">${metric(row.momentum5_pct)}</td>
+      <td class="metric-cell${metricClass(row.momentum20_pct)}" data-label="近 20 日">${metric(row.momentum20_pct)}</td>
+      <td class="volume-cell" data-label="相對量能">${finiteNumber(row.relative_volume) === null ? '—' : `${formatDecimal(row.relative_volume, 2)} 倍`}</td>
+      <td class="trend-cell" data-label="近 20 交易日收盤走勢">${trendMarkup(row.trend)}</td>
       <td class="signals-cell" data-label="量價訊號"><div class="signal-tags">${tags}</div>
         <details class="signal-details"><summary>查看分析依據</summary>
           <p>動能排序分數：${formatDecimal(row.score, 2)}。分數僅用於同日相對排序，並非預測報酬率或達標機率。</p>
@@ -89,7 +113,7 @@ export function updateRanking(state, changes) {
 export function dataURL(staticMode, route, params = {}) {
   if (!staticMode) return `/api/${route}${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`;
   const id = encodeURIComponent(params.id || '');
-  if (route === 'state') return './data/state.json';
+  if (route === 'state') return './data/home.json';
   if (route === 'snapshot') return `./data/snapshots/${id}.json`;
   if (route === 'export') return `./data/csv/${id}-${params.horizon}-${params.sort}.csv`;
   throw new Error('雲端網頁只提供已發布的研究資料');
@@ -443,17 +467,19 @@ function setUpdateButtons(running) {
   for (const button of [$('#updateButton'), $('#emptyUpdateButton')]) {
     if (!button) continue;
     button.disabled = running;
-    if (button.id === 'updateButton') button.lastChild.textContent = STATIC_MODE ? '讀取最新報告' : running ? ' 更新中' : ' 執行資料更新';
+    if (button.id === 'updateButton') button.querySelector('.button-label').textContent = STATIC_MODE ? '重新讀取' : running ? '更新中' : '執行資料更新';
   }
 }
 
 function renderAll() {
   renderSnapshotHeader();
-  renderHistory();
   renderJob();
   renderTwoWeek();
-  renderRows();
-  renderNotes();
+  if (!STATIC_MODE) {
+    renderHistory();
+    renderRows();
+    renderNotes();
+  }
 }
 
 function schedulePoll() {
@@ -739,10 +765,12 @@ function init() {
   if (STATIC_MODE) {
     document.body.classList.add('static-mode');
     $('#settingsButton').hidden = true;
-    $('#updateButton').textContent = '讀取最新報告';
+    $('#updateButton .button-label').textContent = '重新讀取';
     $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
     $('#emptyUpdateButton').textContent = '讀取最新報告';
     $('#exportLink').hidden = true;
+  } else {
+    $('#updateButton .button-label').textContent = '執行資料更新';
   }
   bindEvents();
   loadState();
