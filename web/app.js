@@ -6,6 +6,32 @@ export function twoWeekRows(report) {
   return { label: '量價排序觀察名單 · 樣本外驗證尚未完成', rows: (report?.research_candidates || []).slice(0, 10) };
 }
 
+export function twoWeekTableMarkup(report) {
+  const { rows } = twoWeekRows(report);
+  const showRate = report?.status === 'validated';
+  return `<table class="two-week-results"><thead><tr>
+    <th scope="col">排序</th><th scope="col">標的</th><th scope="col">類型</th>
+    <th scope="col">量價訊號</th>${showRate ? '<th scope="col">組別保守達標率估計</th>' : ''}
+  </tr></thead><tbody>${rows.map((row, index) => {
+    const reasons = [...new Set((Array.isArray(row.reasons) ? row.reasons : []).filter(Boolean))];
+    const tags = reasons.slice(0, 2).map((reason) => `<span class="signal-tag">${escapeHtml(reason)}</span>`).join('')
+      || '<span class="signal-quiet">依綜合量價條件排序</span>';
+    const allReasons = reasons.length ? reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')
+      : '<li>本日未觸發單項量價標記；排序仍綜合相對動能、成交量及波動等因素。</li>';
+    return `<tr>
+      <td class="rank" data-label="排序">${index + 1}</td>
+      <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="mobile-asset-type">${escapeHtml(kindLabel(row.kind))}</small></div></td>
+      <td class="asset-type" data-label="類型">${escapeHtml(kindLabel(row.kind))}</td>
+      <td class="signals-cell" data-label="量價訊號"><div class="signal-tags">${tags}</div>
+        <details class="signal-details"><summary>查看分析依據</summary>
+          <p>動能排序分數：${formatDecimal(row.score, 2)}。分數僅用於同日相對排序，並非預測報酬率或達標機率。</p>
+          <ul>${allReasons}</ul>
+        </details></td>
+      ${showRate ? `<td class="group-rate" data-label="組別保守達標率估計">${formatPercent(row.probability, true)}</td>` : ''}
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
 export function twoWeekSummary(outcomes) {
   const evaluated = outcomes.filter(row => row.status === 'evaluated');
   const incomparable = outcomes.filter(row => row.status === 'not_comparable').length;
@@ -258,7 +284,6 @@ function renderSnapshotHeader() {
   if (!snapshot) {
     $('#snapshotStatus').textContent = '尚無可供查閱的研究報告';
     $('#asOf').textContent = '—';
-    $('#modelVersion').textContent = '—';
     const researchSize = Array.isArray(appState.settings?.symbols) ? appState.settings.symbols.length : 0;
     $('#universeCount').textContent = researchSize ? `${researchSize} 檔研究標的` : '尚無資料';
     return;
@@ -266,10 +291,8 @@ function renderSnapshotHeader() {
   const latest = appState.history[0];
   $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史報告' : '最新報告'}產製於 ${formatDate(snapshot.created_at, true)}`;
   $('#asOf').textContent = formatDate(snapshot.as_of);
-  $('#modelVersion').textContent = snapshot.model_version || '未標示';
   $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔標的` : `${snapshot.rows?.length || 0} 檔清單`;
   const coverage = snapshot.coverage;
-  $('#cloudStatus').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
     $('#cloudTiming').textContent = `資料檢查時間：${formatDate(appState.checkedAt, true)}`;
     $('#cloudSchedule').textContent = appState.schedule;
@@ -308,17 +331,14 @@ function renderTwoWeek() {
   const report = appState.snapshot?.two_week;
   const { label, rows } = twoWeekRows(report);
   $('#twoWeekStatus').textContent = report ? label : '目前報告尚無短期動能分析資料';
+  $('#twoWeekCount').textContent = `${rows.length} 檔標的`;
   $('#twoWeekNote').textContent = report
     ? report.status === 'validated'
       ? '組別達標率根據已封存的逐日訊號進行時間序列驗證，代表排序組別的歷史頻率；日線資料仍不足以確認實際成交。'
       : '目前依價格與成交量進行相對排序。樣本外驗證與機率校準尚未完成，因此不提供個股達標機率；投資區域無法確認的 ETF 暫不納入。'
     : '這份歷史報告產製於短期動能分析啟用前；請選取最新報告。';
   $('#twoWeekTracking').textContent = `本資料日合格標的到期追蹤：${twoWeekSummary(twoWeekOutcomesForSnapshot(appState.twoWeekOutcomes,appState.snapshot?.id))}`;
-  $('#twoWeekBody').innerHTML = rows.map((row,index) => `<tr>
-    <td>${index+1}</td><td><b>${escapeHtml(row.symbol)}</b> · ${escapeHtml(row.name)}</td>
-    <td>${escapeHtml(kindLabel(row.kind))}</td><td>${formatPercent(row.probability,true)}</td>
-    <td>${formatDecimal(row.score,2)}</td><td>${escapeHtml((row.reasons || []).join('、') || '綜合量價特徵')}</td>
-  </tr>`).join('');
+  $('#twoWeekTable').innerHTML = twoWeekTableMarkup(report);
   $('#twoWeekTable').hidden = !rows.length;
   $('#twoWeekEmpty').hidden = !!rows.length;
 }
@@ -715,10 +735,10 @@ function bindEvents() {
 }
 
 function init() {
+  $('#cloudUpdateLink').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
     document.body.classList.add('static-mode');
     $('#settingsButton').hidden = true;
-    $('#cloudStatus').hidden = false;
     $('#updateButton').textContent = '讀取最新報告';
     $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
     $('#emptyUpdateButton').textContent = '讀取最新報告';

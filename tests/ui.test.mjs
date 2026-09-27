@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
+const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekTableMarkup, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
 
 test('two-week main ranking shows at most ten validated picks, or clearly marked research candidates', () => {
   assert.deepEqual(twoWeekRows({ status: 'validated', recommendations: [{symbol:'A',score:3}], research_candidates: [{symbol:'B',score:9}] }),
@@ -16,6 +16,31 @@ test('two-week main ranking shows at most ten validated picks, or clearly marked
 test('matured two-week tracking distinguishes touched and potential fills', () => {
   assert.equal(twoWeekSummary([{status:'evaluated',touched:true,potential_fill:false},{status:'evaluated',touched:true,potential_fill:true},{status:'not_comparable'}]),
     '已核對 2 筆：其中 2 筆曾觸及目標價、1 筆符合保守可成交條件；另有 1 筆因資料或事件因素無法比較。');
+});
+
+test('unvalidated ranking omits unavailable probability and labels every mobile cell', () => {
+  const markup = twoWeekTableMarkup({
+    status: 'insufficient_validation',
+    research_candidates: [{ symbol: '2330', name: '台積電', kind: 'stock', score: 121.35,
+      reasons: ['相對強勢', '成交量擴大', '突破前20日高點'] }],
+  });
+  assert.doesNotMatch(markup, /組別保守達標率估計/);
+  assert.match(markup, /data-label="排序"/);
+  assert.match(markup, /data-label="標的"/);
+  assert.match(markup, /data-label="類型"/);
+  assert.match(markup, /data-label="量價訊號"/);
+  assert.match(markup, /相對強勢/);
+  assert.match(markup, /成交量擴大/);
+  assert.match(markup, /<details[^>]*>.*突破前20日高點/s);
+  assert.match(markup, /121\.35/);
+});
+
+test('validated ranking identifies group rate as an estimate', () => {
+  const markup = twoWeekTableMarkup({status:'validated',recommendations:[
+    {symbol:'A',name:'示例',kind:'etf',score:10,probability:0.43,reasons:[]},
+  ]});
+  assert.match(markup, /組別保守達標率估計/);
+  assert.match(markup, /data-label="組別保守達標率估計">43\.0%/);
 });
 
 test('tracking beside a daily list includes only that snapshot', () => {

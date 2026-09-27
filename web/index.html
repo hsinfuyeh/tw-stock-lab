@@ -15,60 +15,31 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span><b>臺股研究台</b><small>TW STOCK LAB</small></span>
     </a>
-    <div class="header-tools">
-      <label class="snapshot-picker">
-        <span>歷史報告</span>
-        <select id="snapshotSelect" aria-label="選擇歷史研究報告" disabled>
-          <option>讀取中…</option>
-        </select>
-      </label>
-      <button class="button button-quiet" id="settingsButton" type="button" aria-haspopup="dialog">
-        <span aria-hidden="true">⚙</span> 分析參數
-      </button>
-      <button class="button button-primary" id="updateButton" type="button">
-        <span class="button-icon" aria-hidden="true">↻</span> 重新整理資料
-      </button>
-    </div>
+    <nav class="header-tools" aria-label="頁面導覽">
+      <a href="#twoWeekTitle">觀察名單</a>
+      <a href="#researchMethods">研究方法</a>
+    </nav>
   </header>
 
   <main id="main">
-    <section id="cloudStatus" class="cloud-status" hidden aria-label="雲端更新與研究範圍">
-      <div class="cloud-status-head">
-        <div><strong>臺灣上市股票與股票型 ETF · 盤後更新</strong><p id="cloudTiming"></p></div>
-        <div class="cloud-actions">
-          <details class="info-popover cloud-details">
-            <summary>ⓘ 資料更新說明</summary>
-            <div class="info-panel">
-              <h3>更新時程與資料涵蓋範圍</h3>
-              <p id="cloudSchedule"></p><p id="coverageText"></p>
-              <p class="update-help">「讀取最新報告」僅重新載入已發布的資料。如需執行資料更新，請以具備權限的 GitHub 帳號啟動工作流程（Run workflow → main → Run workflow）；流程完成後再重新載入報告。臺灣時間 19:00 前執行時，以前一交易日為資料基準日。</p>
-              <small>CSV 收錄所選期限的全部標的；頁面搜尋與篩選不影響匯出內容。</small>
-            </div>
-          </details>
-          <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">執行更新／查看進度 ↗</a>
-        </div>
-      </div>
-      <details id="ageWarning" class="info-popover freshness-details" hidden>
-        <summary>⚠ 資料時效提醒</summary>
-        <div class="info-panel"><p id="ageWarningDetail"></p></div>
-      </details>
-    </section>
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
-        <p class="eyebrow">每日盤後更新 · 十個交易日觀察期</p>
-        <h1 id="pageTitle">短期動能 <em>+5%</em> 目標觀察</h1>
-        <p class="lede">依盤後價格與成交量評估相對動能，追蹤下一交易日進場後十個交易日內的價格目標。</p>
+        <p class="eyebrow">臺股盤後研究 · 十個交易日觀察期</p>
+        <h1 id="pageTitle">短期動能觀察</h1>
+        <p class="lede">依盤後量價排序，追蹤下一交易日進場後十個交易日內的 <strong>+5% 價格目標</strong>。</p>
       </div>
-      <div class="snapshot-card" id="snapshotCard" aria-live="polite">
+      <div class="report-identity" id="snapshotCard" aria-live="polite">
+        <div class="report-date">
+          <span>資料基準日</span><strong id="asOf">—</strong>
+        </div>
         <div class="snapshot-topline">
           <span class="live-dot" aria-hidden="true"></span>
           <span id="snapshotStatus">正在載入研究報告</span>
         </div>
-        <dl class="snapshot-facts">
-          <div><dt>資料基準日</dt><dd id="asOf">—</dd></div>
-          <div><dt>分析版本</dt><dd id="modelVersion">—</dd></div>
-          <div><dt>涵蓋標的</dt><dd id="universeCount">—</dd></div>
-        </dl>
+        <details id="ageWarning" class="info-popover freshness-details" hidden>
+          <summary>⚠ 資料時效提醒</summary>
+          <div class="info-panel"><p id="ageWarningDetail"></p></div>
+        </details>
       </div>
     </section>
 
@@ -87,13 +58,18 @@
     </section>
 
     <section class="workspace" aria-labelledby="twoWeekTitle">
-      <div class="section-heading"><div><p class="section-kicker">短期動能觀察</p><h2 id="twoWeekTitle">十個交易日內 +5% 價格目標</h2></div></div>
-      <p id="twoWeekStatus" aria-live="polite">載入中</p>
-      <p id="twoWeekNote"></p>
-      <p id="twoWeekTracking"></p>
-      <div class="table-shell" id="twoWeekTable" hidden><table><thead><tr><th>排序</th><th>標的</th><th>類型</th><th>組別保守達標率估計</th><th>動能排序分數</th><th>量價觀察依據</th></tr></thead><tbody id="twoWeekBody"></tbody></table></div>
+      <div class="section-heading"><div><p class="section-kicker">盤後研究結果</p><h2 id="twoWeekTitle">觀察名單</h2></div><strong id="twoWeekCount" class="result-count">—</strong></div>
+      <p id="twoWeekStatus" class="research-state" aria-live="polite">載入中</p>
+      <div class="table-shell" id="twoWeekTable" hidden></div>
       <p id="twoWeekEmpty" hidden>本次報告沒有符合篩選條件的標的。</p>
-      <p class="research-disclaimer">達標率如有顯示，係同類排序組別符合保守出場條件的歷史估計，並非個股預測。保守條件以日線價格高於目標價一檔判定，仍無法證明委託實際成交；名單依資料日封存並於期滿後核對。</p>
+      <details id="researchMethods" class="method-details">
+        <summary>研究方法、到期追蹤與風險說明</summary>
+        <div class="method-body">
+          <p id="twoWeekNote"></p>
+          <p id="twoWeekTracking"></p>
+          <p>達標率如有顯示，係同類排序組別符合保守出場條件的歷史估計，並非個股預測。保守條件以日線價格高於目標價一檔判定，仍無法證明委託實際成交；名單依資料日封存並於期滿後核對。</p>
+        </div>
+      </details>
     </section>
     <details class="legacy-research"><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">
@@ -201,6 +177,23 @@
         <button class="button button-primary" id="emptyUpdateButton" type="button">執行資料更新</button>
       </div>
     </section>
+    </details>
+
+    <details id="cloudStatus" class="maintenance-details">
+      <summary>資料與維護資訊</summary>
+      <div class="maintenance-body">
+        <p>臺灣上市股票與股票型 ETF · 盤後更新</p>
+        <label class="snapshot-picker"><span>查閱歷史報告</span><select id="snapshotSelect" aria-label="選擇歷史研究報告" disabled><option>讀取中…</option></select></label>
+        <p id="cloudTiming"></p><p id="cloudSchedule"></p><p id="coverageText"></p>
+        <dl class="maintenance-facts"><div><dt>涵蓋標的</dt><dd id="universeCount">—</dd></div></dl>
+        <p>「讀取最新報告」僅重新載入已發布的資料。如需執行資料更新，請以具備權限的 GitHub 帳號啟動工作流程（Run workflow → main → Run workflow）；流程完成後再重新載入報告。臺灣時間 19:00 前執行時，以前一交易日為資料基準日。</p>
+        <div class="maintenance-actions">
+          <button class="button button-quiet" id="updateButton" type="button"><span class="button-icon" aria-hidden="true">↻</span> 重新整理資料</button>
+          <button class="button button-quiet" id="settingsButton" type="button" aria-haspopup="dialog"><span aria-hidden="true">⚙</span> 分析參數</button>
+          <a id="cloudUpdateLink" class="button button-outline" href="https://github.com/hsinfuyeh/tw-stock-lab/actions/workflows/market-pages.yml" target="_blank" rel="noopener noreferrer">執行更新／查看進度 ↗</a>
+        </div>
+        <small>CSV 收錄所選期限的全部標的；頁面搜尋與篩選不影響匯出內容。</small>
+      </div>
     </details>
 
   </main>
