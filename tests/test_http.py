@@ -25,6 +25,9 @@ class HttpTests(unittest.TestCase):
         self.assertIsNone(payload["latest"])
         self.assertEqual(payload["history"],[])
         self.assertFalse(payload["job"]["running"])
+        with urlopen(self.base+'/api/social') as response: social=json.load(response)
+        self.assertIsNone(social['collected_at'])
+        self.assertEqual(social['sources'],{})
     def test_settings_persist_and_bad_values_do_not_overwrite(self):
         params=dict(DEFAULT_SETTINGS,min_probability=.6)
         req=Request(self.base+"/api/settings",json.dumps(params).encode(),{"Content-Type":"application/json"})

@@ -27,6 +27,9 @@ def make_server(service,port=8765):
             request=urlparse(self.path); q=parse_qs(request.query)
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
+                if request.path=="/api/social":
+                    from .social import empty_report
+                    return self.send(200,service.store.get('social_report') or empty_report())
                 if request.path=="/api/explore":
                     from .explore import explore_catalog
                     return self.send(200,explore_catalog(service.store.snapshot(),static=False))
@@ -36,7 +39,7 @@ def make_server(service,port=8765):
                 if request.path=="/api/reconciled": return self.send(200,service.store.get("reconciled",[]))
                 if request.path=="/api/export":
                     return self.send(200,service.export_csv(int(q.get("horizon",[7])[0]),q.get("sort",["expected_return"])[0],q.get("id",[None])[0]),"text/csv; charset=utf-8")
-                files={"/":("index.html","text/html"),"/index.html":("index.html","text/html"),"/app.js":("app.js","text/javascript"),"/style.css":("style.css","text/css")}
+                files={"/":("index.html","text/html"),"/index.html":("index.html","text/html"),"/app.js":("app.js","text/javascript"),"/social.js":("social.js","text/javascript"),"/style.css":("style.css","text/css")}
                 if request.path not in files: return self.send(404,{"error":"找不到頁面"})
                 filename,mime=files[request.path]
                 return self.send(200,(web/filename).read_bytes(),mime+"; charset=utf-8")

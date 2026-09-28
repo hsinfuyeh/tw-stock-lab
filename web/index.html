@@ -19,6 +19,7 @@
       <a href="#home" data-view-link="home">首頁</a>
       <a href="#today" data-view-link="today">今日名單</a>
       <a href="#rankings" data-view-link="rankings">其他排行</a>
+      <a href="#social" data-view-link="social">社群聲量</a>
     </nav>
     <div class="header-tools">
       <button class="button button-outline" id="updateButton" type="button" title="重新讀取已發布的盤後報告；不會啟動資料抓取"><span class="button-icon" aria-hidden="true">↻</span><span class="button-label">重新讀取</span></button>
@@ -95,6 +96,17 @@
           <p class="ranking-footnote">排行描述截至資料日的歷史行情，並非買賣建議。僅比較新臺幣標的；缺漏、無有效當日行情或公司行動影響的指標不納入相關排行。</p>
         </div>
       </div>
+    </section>
+    <section id="socialView" class="workspace" data-view="social" aria-labelledby="socialTitle" hidden>
+      <div class="section-heading"><div><p class="section-kicker">公開討論觀察</p><h2 id="socialTitle">社群聲量排行</h2></div></div>
+      <p class="search-hint">依觀察到的不同主貼文篇數排序。同篇提及同股票只算一次，不含留言及圖片文字；討論多不代表看多。平台搜尋與收集上限造成取樣差異，非全平台完整聲量。</p>
+      <div class="social-sources" data-social-status></div>
+      <div class="social-controls"><label>統計期間 <select data-social-window><option value="24h">近 24 小時</option><option value="7d">近 7 天</option></select></label><label>來源 <select data-social-source><option value="all">已取得來源合計</option><option value="ptt">PTT</option><option value="dcard">Dcard</option><option value="threads">Threads</option></select></label></div>
+      <p data-social-summary class="explore-summary" aria-live="polite"></p>
+      <p data-social-stale class="essential-warning" hidden>社群資料超過 30 小時未更新，請確認收集時間與來源狀態。</p>
+      <div data-social-results></div>
+      <div class="pagination" data-social-pager hidden><button class="button button-quiet" data-social-prev>上一頁</button><span data-social-page></span><button class="button button-quiet" data-social-next>下一頁</button></div>
+      <section class="social-evidence" data-social-evidence-panel hidden><div class="section-heading"><h3 data-social-evidence-title></h3><button class="button button-quiet" data-social-close>收起依據</button></div><ul data-social-evidence-list></ul></section>
     </section>
     <details class="legacy-research" hidden><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">

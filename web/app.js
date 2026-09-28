@@ -157,6 +157,7 @@ export function dataURL(staticMode, route, params = {}) {
   const id = encodeURIComponent(params.id || '');
   if (route === 'state') return './data/home.json';
   if (route === 'explore') return './data/explore.json';
+  if (route === 'social') return './data/social.json';
   if (route === 'snapshot') return `./data/snapshots/${id}.json`;
   if (route === 'export') return `./data/csv/${id}-${params.horizon}-${params.sort}.csv`;
   throw new Error('雲端網頁只提供已發布的研究資料');
@@ -731,12 +732,15 @@ function renderView() {
     home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
     today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
     rankings: ['其他排行', '從成交金額、漲跌、量能與波動，探索同一資料日的市場表現。'],
+    social: ['社群聲量', '觀察 PTT、Dcard、Threads 的公開股票討論，核對來源與提及篇數。'],
   };
   appState.view = Object.hasOwn(views, location.hash.slice(1)) ? location.hash.slice(1) : 'home';
   const [title, copy] = views[appState.view];
   $('#pageTitle').textContent = title;
   $('.hero .lede').textContent = copy;
   document.title = `${title} · 臺股研究台`;
+  $('.hero .eyebrow').textContent=appState.view==='social'?'臺股社群研究 · 公開討論觀察':'臺股盤後研究 · 十個交易日觀察期';
+  $('#snapshotCard').hidden = appState.view === 'social';
   $$('[data-view]').forEach(el => { el.hidden = el.dataset.view !== appState.view; });
   $$('[data-view-link]').forEach(el => {
     if (el.dataset.viewLink === appState.view) el.setAttribute('aria-current', 'page');
@@ -744,6 +748,14 @@ function renderView() {
   });
   renderExplorer();
   if (appState.view !== 'today') ensureCatalog();
+  if (appState.view === 'social') loadSocialView();
+}
+
+let socialViewPromise;
+async function loadSocialView() {
+  if (!socialViewPromise) socialViewPromise = import('./social.js').then(({createSocialView}) => createSocialView($('#socialView'), () => fetchJSON(dataURL(STATIC_MODE,'social'))));
+  try { await (await socialViewPromise).load(); }
+  catch { $('#socialView [data-social-summary]').textContent='社群功能載入失敗，請重新整理。'; socialViewPromise=null; }
 }
 
 function exploreTable(rows, start, rankConfig = null) {

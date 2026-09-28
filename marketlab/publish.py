@@ -15,6 +15,9 @@ def export_site(service,output):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     for source in (Path(__file__).resolve().parents[1]/'web').iterdir():
         if source.is_file(): shutil.copyfile(source,output/source.name)
+    social_version=hashlib.sha256((output/'social.js').read_bytes()).hexdigest()[:12]
+    app=(output/'app.js').read_text(encoding='utf-8').replace("import('./social.js')",f"import('./social.js?v={social_version}')")
+    (output/'app.js').write_text(app,encoding='utf-8')
     html=(output/'index.html').read_text(encoding='utf-8')
     html=html.replace('<head>','<head>\n  <meta name="deployment-mode" content="static">',1)
     for asset in ('style.css','app.js'):
@@ -72,4 +75,6 @@ def export_site(service,output):
         two_week_outcomes=[row for row in state['two_week_outcomes'] if row['snapshot_id']==latest['id']])
     atomic_json(output/'data/home.json',home)
     atomic_json(output/'data/explore.json',explore_catalog(latest))
+    from .social import empty_report
+    atomic_json(output/'data/social.json',service.store.get('social_report') or empty_report())
     return dict(as_of=latest['as_of'],count=len(latest['rows']),files=sum(p.is_file() for p in output.rglob('*')))

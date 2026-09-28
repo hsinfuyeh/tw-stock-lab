@@ -4,6 +4,16 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
+
+test('social pages exclude unavailable sources, use per-platform ranks, and cap at ten', async () => {
+  const {socialPage}=await import('../web/social.js');
+  const rows=Array.from({length:23},(_,i)=>({symbol:String(i),total:23-i,counts:{ptt:23-i,dcard:null,threads:null}}));
+  const report={windows:{'24h':rows}};
+  assert.equal(socialPage(report,'24h','all').rows.length,10);
+  assert.equal(socialPage(report,'24h','dcard').total,0);
+  assert.equal(socialPage(report,'24h','ptt',99).rows.length,3);
+  assert.equal(socialPage(report,'24h','ptt',99).page,3);
+});
 const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekTableMarkup, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
 
 test('individual search matches both 台 and 臺 names and exact code comes first', async () => {

@@ -56,6 +56,10 @@ class PublishTests(unittest.TestCase):
             self.assertRegex(html,r'\./style\.css\?v=[0-9a-f]{12}')
             self.assertRegex(html,r'\./app\.js\?v=[0-9a-f]{12}')
             self.assertEqual(state['next_session'],'2026-09-21')
+            social=json.loads((out/'data/social.json').read_text(encoding='utf-8'))
+            self.assertIsNone(social['collected_at'],'no collection must not invent a fresh timestamp')
+            self.assertEqual(social['windows']['24h'],[])
+            self.assertRegex((out/'app.js').read_text(encoding='utf-8'),r"import\('\./social\.js\?v=[0-9a-f]{12}'\)")
 
     def test_homepage_enriches_old_archived_candidates_from_same_day_bars(self):
         with tempfile.TemporaryDirectory() as root:
