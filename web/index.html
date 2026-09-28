@@ -29,8 +29,8 @@
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
         <p class="eyebrow">臺股盤後研究 · 十個交易日觀察期</p>
-        <h1 id="pageTitle">短期動能觀察</h1>
-        <p class="lede">依盤後量價排序，追蹤下一交易日進場後十個交易日內的 <strong>+5% 價格目標</strong>。</p>
+        <h1 id="pageTitle">個股查詢</h1>
+        <p class="lede">輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。</p>
       </div>
       <div class="report-identity" id="snapshotCard" aria-live="polite">
         <div class="report-date">
@@ -62,10 +62,9 @@
     </section>
 
     <section class="workspace home-workspace" id="homeView" data-view="home" aria-labelledby="homeTitle">
-      <div class="section-heading"><div><p class="section-kicker">探索個股</p><h2 id="homeTitle">個股查詢</h2></div><span class="result-count" id="catalogCount">載入中</span></div>
-      <label class="stock-search" for="stockSearch"><span>搜尋股票代號或名稱</span><input id="stockSearch" type="search" placeholder="例如 2330、台積電、元大台灣50" autocomplete="off"></label>
-      <p class="search-hint">支援部分名稱、代號，以及「台／臺」同義搜尋。點選個股詳情查看 K 線、成交量與歷史分析。</p>
-      <p id="homeSummary" class="explore-summary" aria-live="polite">正在讀取個股資料…</p>
+      <h2 id="homeTitle" class="sr-only">個股查詢</h2><span id="catalogCount" hidden></span>
+      <label class="stock-search" for="stockSearch"><span class="sr-only">搜尋股票代號或名稱</span><input id="stockSearch" type="search" placeholder="輸入代號或名稱，例如 2330、台積電" autocomplete="off"></label>
+      <p id="homeSummary" class="explore-summary" aria-live="polite" hidden></p>
       <div id="homeResults"></div>
       <div class="pagination" id="homePager" hidden><button class="button button-quiet" id="homePrev" type="button">上一頁</button><span id="homePageText"></span><button class="button button-quiet" id="homeNext" type="button">下一頁</button></div>
     </section>

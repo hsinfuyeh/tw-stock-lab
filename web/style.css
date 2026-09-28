@@ -16,6 +16,9 @@
   --shadow: 0 18px 55px rgba(16, 46, 58, .09);
   --radius: 18px;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-body: 16px;
+  --text-small: 14px;
+  --text-section: 24px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
   color: var(--ink);
   background: var(--cream);
@@ -36,7 +39,7 @@
 .rank-content { min-width: 0; }
 .rank-content h3 { margin: 0 0 8px; font-size: 23px; }
 .ranking-footnote { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; font-size: 12px; }
-.explore-table { min-width: 710px; table-layout: auto; }
+.explore-table { min-width: 850px; table-layout: fixed; }
 .explore-table th, .explore-table td { text-align: left; padding: 15px 10px; }
 .explore-table th { font-size: 12px; white-space: nowrap; }
 .explore-table .primary-security b { display: block; font: 750 17px var(--mono); }
@@ -423,4 +426,66 @@ body.static-mode .hero { padding: 34px 0 20px; }
   .header-tools { width: auto; flex-shrink: 0; }
   h1 { font-size: clamp(30px,8.6vw,40px); line-height: 1.22; }
   body.static-mode .hero { grid-template-columns: 1fr; gap: 14px; padding: 20px 2px 16px; }
+}
+
+/* Shared reading sizes and stable table columns across results pages. */
+body { font-size: var(--text-body); line-height: 1.65; }
+h1 { font-size: clamp(36px, 4vw, 52px); line-height: 1.25; }
+h2 { font-size: clamp(28px, 3vw, 32px); line-height: 1.35; }
+h3, .rank-content h3, .detail-section h3 { font-size: var(--text-section); line-height: 1.4; }
+.lede, .notice p, .method-body, .maintenance-body, .notes-grid p:not(.section-kicker),
+.notes-grid li, .drawer-header > div > p:last-child, .reason-chip, .calibration { font-size: var(--text-body); line-height: 1.75; }
+.search-hint, .ranking-footnote, .explore-summary, .research-state, .report-date span,
+.snapshot-topline, .signal-tag, .signal-quiet, .signal-details, .detail-stat small,
+.detail-section-header span, .validation-grid small, .validation-status,
+.method-details summary, .maintenance-details > summary, .info-popover > summary,
+.essential-warning, footer { font-size: var(--text-small); }
+.main-nav a, .rank-nav button, .button, .explore-table .button,
+.two-week-results .explore-action .button { font-size: var(--text-body); }
+th, td, .sample-table th, .sample-table td,
+.two-week-results th, .two-week-results td, .explore-table th, .explore-table td {
+  text-align: left; padding: 16px 12px; font-size: var(--text-body); letter-spacing: 0;
+}
+.explore-table th, .two-week-results th { font-size: var(--text-small); }
+.explore-table .primary-security span, .two-week-results .primary-security span { font-size: var(--text-body); }
+.asset-badge, .stale-security, .trend-empty, .rank { font-size: var(--text-small); }
+.home-workspace .stock-search { max-width: 760px; margin: 0 auto; }
+.home-workspace .stock-search input { height: 60px; font-size: 18px; }
+.explore-table th:nth-child(1) { width: 7%; }
+.explore-table th:nth-child(2) { width: 27%; }
+.explore-table th:nth-child(3) { width: 15%; }
+.explore-table th:nth-child(4) { width: 17%; }
+.explore-table th:nth-child(5) { width: 20%; }
+.explore-table th:nth-child(6) { width: 14%; }
+.explore-table .trend-cell, .explore-table .explore-action { width: auto; }
+.primary-security { overflow-wrap: anywhere; }
+.two-week-results { min-width: 1120px; }
+.two-week-results th:nth-child(1) { width: 4%; }
+.two-week-results th:nth-child(2) { width: 14%; }
+.two-week-results th:nth-child(3) { width: 10%; }
+.two-week-results th:nth-child(4), .two-week-results th:nth-child(5) { width: 9%; }
+.two-week-results th:nth-child(6) { width: 10%; }
+.two-week-results th:nth-child(7) { width: 15%; }
+.two-week-results th:nth-child(8) { width: 19%; }
+.two-week-results th:last-child { width: 10%; }
+.sample-table { table-layout: fixed; min-width: 660px; }
+.sample-table th { width: 20%; white-space: normal; }
+.drawer { width: min(920px, 96vw); }
+.detail-stat small { display: block; }
+.detail-stat b { font-size: 22px; }
+.validation-grid b { font-size: 18px; }
+.detail-section-header, .validation-head { flex-wrap: wrap; }
+@media (max-width: 700px) {
+  h1 { font-size: 36px; }
+  h2 { font-size: 28px; }
+  .explore-table, .two-week-results { min-width: 0; }
+  .explore-table td, .two-week-results td { padding: 0; font-size: var(--text-body); text-align: left; }
+  .two-week-results td.close-cell { text-align: left; }
+  .explore-table td::before, .two-week-results td::before { font-size: var(--text-small); }
+  .sample-table { display: table; }
+  .sample-table thead { display: table-header-group; }
+  .sample-table tbody { display: table-row-group; }
+  .sample-table tr { display: table-row; }
+  .sample-table th, .sample-table td { display: table-cell; padding: 14px 10px; }
+  .sample-table td::before { display: none; }
 }

@@ -665,7 +665,7 @@ function chartSvg(bars = [], signals = []) {
     close: finiteNumber(bar.close), volume: finiteNumber(bar.volume),
   })).filter((bar) => [bar.open, bar.high, bar.low, bar.close].every((value) => value !== null));
   if (!clean.length) return '<div class="notice"><p>此列沒有可繪製的有效 OHLC 資料。</p></div>';
-  const width = 700, height = 310, left = 44, right = 12, priceTop = 16, priceBottom = 216, volumeTop = 239, volumeBottom = 286;
+  const width = 700, height = 310, left = 56, right = 12, priceTop = 16, priceBottom = 216, volumeTop = 239, volumeBottom = 286;
   const lows = clean.map(({ low }) => low), highs = clean.map(({ high }) => high);
   let minPrice = Math.min(...lows), maxPrice = Math.max(...highs);
   if (minPrice === maxPrice) { minPrice -= 1; maxPrice += 1; }
@@ -678,7 +678,7 @@ function chartSvg(bars = [], signals = []) {
   const grid = [0, .25, .5, .75, 1].map((fraction) => {
     const y = priceTop + (priceBottom - priceTop) * fraction;
     const price = maxPrice - (maxPrice - minPrice) * fraction;
-    return `<line x1="${left}" y1="${y}" x2="${width-right}" y2="${y}" stroke="#ccd1ca" stroke-width="1"/><text x="${left-6}" y="${y+3}" text-anchor="end" fill="#718083" font-size="9" font-family="monospace">${price.toFixed(1)}</text>`;
+    return `<line x1="${left}" y1="${y}" x2="${width-right}" y2="${y}" stroke="#ccd1ca" stroke-width="1"/><text x="${left-6}" y="${y+3}" text-anchor="end" fill="#718083" font-size="12" font-family="monospace">${price.toFixed(1)}</text>`;
   }).join('');
   const candles = clean.map((bar, index) => {
     const x = left + step * index + step / 2;
@@ -694,8 +694,8 @@ function chartSvg(bars = [], signals = []) {
   const lastDate = escapeHtml(clean.at(-1).date || '');
   return `<div class="chart-wrap"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="最近 ${clean.length} 筆 K 線與成交量">
     ${grid}<line x1="${left}" y1="${priceBottom}" x2="${width-right}" y2="${priceBottom}" stroke="#9ca9a6"/><line x1="${left}" y1="${volumeBottom}" x2="${width-right}" y2="${volumeBottom}" stroke="#9ca9a6"/>
-    ${candles}<text x="${left}" y="${height-6}" fill="#718083" font-size="9" font-family="monospace">${firstDate}</text><text x="${width-right}" y="${height-6}" text-anchor="end" fill="#718083" font-size="9" font-family="monospace">${lastDate}</text>
-    <circle cx="${width-100}" cy="10" r="3" fill="#c79b4a"/><text x="${width-92}" y="13" fill="#718083" font-size="9">訊號日</text>
+    ${candles}<text x="${left}" y="${height-6}" fill="#718083" font-size="12" font-family="monospace">${firstDate}</text><text x="${width-right}" y="${height-6}" text-anchor="end" fill="#718083" font-size="12" font-family="monospace">${lastDate}</text>
+    <circle cx="${width-100}" cy="10" r="3" fill="#c79b4a"/><text x="${width-92}" y="13" fill="#718083" font-size="12">訊號日</text>
   </svg></div>`;
 }
 
@@ -728,7 +728,7 @@ async function ensureCatalog() {
 
 function renderView() {
   const views = {
-    home: ['個股探索', '搜尋上市股票與股票型 ETF，查看盤後行情、近期走勢與分析資訊。'],
+    home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
     today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
     rankings: ['其他排行', '從成交金額、漲跌、量能與波動，探索同一資料日的市場表現。'],
   };
@@ -776,11 +776,19 @@ function renderExplorer() {
   $('#marketRankTitle').textContent = config.label;
   $('#marketRankNote').textContent = config.note;
   for (const isHome of [true,false]) {
+    if (isHome && !appState.homeQuery.trim()) {
+      $('#homeSummary').textContent = '';
+      $('#homeSummary').hidden = true;
+      $('#homeResults').innerHTML = '';
+      $('#homePager').hidden = true;
+      continue;
+    }
     const rows = isHome ? searchSecurities(appState.catalog,appState.homeQuery) : rankMarketRows(appState.catalog,appState.rankKey);
     const paged = paginateExplorer(rows, isHome ? appState.homePage : appState.rankPage);
     if (isHome) appState.homePage = paged.page; else appState.rankPage = paged.page;
     const prefix = isHome ? 'home' : 'rank';
     const summary = isHome ? $('#homeSummary') : $('#marketRankSummary');
+    summary.hidden = false;
     summary.textContent = ready ? `${appState.snapshot.as_of} · 共 ${rows.length} 檔${isHome && !appState.homeQuery ? ' · 依代號排列，非推薦順序' : ''} · 每頁最多 10 檔` : status;
     (isHome ? $('#homeResults') : $('#marketRankResults')).innerHTML = ready ? exploreTable(paged.rows,paged.start,isHome ? null : config) : '';
     $(`#${prefix}Pager`).hidden = !ready || !rows.length;
