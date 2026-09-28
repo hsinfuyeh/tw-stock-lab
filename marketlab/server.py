@@ -27,6 +27,9 @@ def make_server(service,port=8765):
             request=urlparse(self.path); q=parse_qs(request.query)
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
+                if request.path=="/api/explore":
+                    from .explore import explore_catalog
+                    return self.send(200,explore_catalog(service.store.snapshot(),static=False))
                 if request.path=="/api/snapshot":
                     snap=service.store.snapshot(q.get("id",[None])[0])
                     return self.send(200,snap) if snap else self.send(404,{"error":"找不到快照"})

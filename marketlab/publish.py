@@ -6,6 +6,7 @@ import re
 import shutil
 from .analytics import HORIZONS,target_date,features_at
 from .data import atomic_json,now
+from .explore import explore_catalog
 
 
 def export_site(service,output):
@@ -70,4 +71,5 @@ def export_site(service,output):
         history=histories[:1],checked_at=state['checked_at'],next_session=state['next_session'],
         two_week_outcomes=[row for row in state['two_week_outcomes'] if row['snapshot_id']==latest['id']])
     atomic_json(output/'data/home.json',home)
+    atomic_json(output/'data/explore.json',explore_catalog(latest))
     return dict(as_of=latest['as_of'],count=len(latest['rows']),files=sum(p.is_file() for p in output.rglob('*')))

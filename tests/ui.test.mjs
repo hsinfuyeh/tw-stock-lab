@@ -6,6 +6,34 @@ const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8')
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekTableMarkup, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
 
+test('individual search matches both 台 and 臺 names and exact code comes first', async () => {
+  const { searchSecurities } = await import(moduleUrl);
+  assert.equal(typeof searchSecurities, 'function');
+  const rows=[{symbol:'23301',name:'台灣公司'},{symbol:'2330',name:'台積電'},{symbol:'0050',name:'元大台灣50'}];
+  assert.deepEqual(searchSecurities(rows,'2330').map(r=>r.symbol),['2330','23301']);
+  assert.deepEqual(searchSecurities(rows,'臺積電').map(r=>r.symbol),['2330']);
+});
+
+test('market ranks discard missing values and distinguish rises, falls and breakouts', async () => {
+  const { rankMarketRows } = await import(moduleUrl);
+  assert.equal(typeof rankMarketRows, 'function');
+  const rows=[{symbol:'A',metrics:{change_pct:2,turnover:50,new_high20:true,momentum20_pct:5}},
+    {symbol:'B',metrics:{change_pct:-3,turnover:100,new_high20:false}},
+    {symbol:'C',metrics:{change_pct:null,turnover:null,new_high20:null}}];
+  assert.deepEqual(rankMarketRows(rows,'gainers').map(r=>r.symbol),['A']);
+  assert.deepEqual(rankMarketRows(rows,'losers').map(r=>r.symbol),['B']);
+  assert.deepEqual(rankMarketRows(rows,'amount').map(r=>r.symbol),['B','A']);
+  assert.deepEqual(rankMarketRows(rows,'high20').map(r=>r.symbol),['A']);
+});
+
+test('explorer never shows more than ten securities and clamps the last page', async () => {
+  const { paginateExplorer } = await import(moduleUrl);
+  assert.equal(typeof paginateExplorer, 'function');
+  const rows=Array.from({length:23},(_,symbol)=>({symbol}));
+  assert.equal(paginateExplorer(rows,1).rows.length,10);
+  assert.deepEqual(paginateExplorer(rows,99).rows.map(r=>r.symbol),[20,21,22]);
+});
+
 test('two-week main ranking shows at most ten validated picks, or clearly marked research candidates', () => {
   assert.deepEqual(twoWeekRows({ status: 'validated', recommendations: [{symbol:'A',score:3}], research_candidates: [{symbol:'B',score:9}] }),
     {label:'符合樣本外驗證門檻的觀察名單',rows:[{symbol:'A',score:3}]});

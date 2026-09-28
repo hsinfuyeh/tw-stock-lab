@@ -15,6 +15,11 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span><b>臺股研究台</b><small>TW STOCK LAB</small></span>
     </a>
+    <nav class="main-nav" aria-label="主要導覽">
+      <a href="#home" data-view-link="home">首頁</a>
+      <a href="#today" data-view-link="today">今日名單</a>
+      <a href="#rankings" data-view-link="rankings">其他排行</a>
+    </nav>
     <div class="header-tools">
       <button class="button button-outline" id="updateButton" type="button" title="重新讀取已發布的盤後報告；不會啟動資料抓取"><span class="button-icon" aria-hidden="true">↻</span><span class="button-label">重新讀取</span></button>
     </div>
@@ -56,7 +61,16 @@
       <button class="button button-quiet" id="retryButton" type="button">重試</button>
     </section>
 
-    <section class="workspace" aria-labelledby="twoWeekTitle">
+    <section class="workspace home-workspace" id="homeView" data-view="home" aria-labelledby="homeTitle">
+      <div class="section-heading"><div><p class="section-kicker">探索個股</p><h2 id="homeTitle">個股查詢</h2></div><span class="result-count" id="catalogCount">載入中</span></div>
+      <label class="stock-search" for="stockSearch"><span>搜尋股票代號或名稱</span><input id="stockSearch" type="search" placeholder="例如 2330、台積電、元大台灣50" autocomplete="off"></label>
+      <p class="search-hint">支援部分名稱、代號，以及「台／臺」同義搜尋。點選個股詳情查看 K 線、成交量與歷史分析。</p>
+      <p id="homeSummary" class="explore-summary" aria-live="polite">正在讀取個股資料…</p>
+      <div id="homeResults"></div>
+      <div class="pagination" id="homePager" hidden><button class="button button-quiet" id="homePrev" type="button">上一頁</button><span id="homePageText"></span><button class="button button-quiet" id="homeNext" type="button">下一頁</button></div>
+    </section>
+
+    <section class="workspace" id="todayView" data-view="today" aria-labelledby="twoWeekTitle" hidden>
       <div class="section-heading"><div><p class="section-kicker">盤後研究結果</p><h2 id="twoWeekTitle">觀察名單</h2></div><strong id="twoWeekCount" class="result-count">—</strong></div>
       <p id="twoWeekStatus" class="research-state" aria-live="polite">載入中</p>
       <div class="table-shell" id="twoWeekTable" hidden></div>
@@ -70,6 +84,18 @@
           <p>達標率如有顯示，係同類排序組別符合保守出場條件的歷史估計，並非個股預測。保守條件以日線價格高於目標價一檔判定，仍無法證明委託實際成交；名單依資料日封存並於期滿後核對。</p>
         </div>
       </details>
+    </section>
+    <section class="workspace rankings-workspace" id="rankingsView" data-view="rankings" aria-labelledby="marketRankingTitle" hidden>
+      <div class="section-heading"><div><p class="section-kicker">同日市場觀察</p><h2 id="marketRankingTitle">其他排行</h2></div><span class="result-count">7 種排行</span></div>
+      <div class="rankings-layout">
+        <nav id="marketRankNav" class="rank-nav" aria-label="排行分類"></nav>
+        <div class="rank-content"><h3 id="marketRankTitle">成交金額</h3><p id="marketRankNote" class="search-hint"></p>
+          <p id="marketRankSummary" class="explore-summary" aria-live="polite">正在讀取排行…</p>
+          <div id="marketRankResults"></div>
+          <div class="pagination" id="rankPager" hidden><button class="button button-quiet" id="rankPrev" type="button">上一頁</button><span id="rankPageText"></span><button class="button button-quiet" id="rankNext" type="button">下一頁</button></div>
+          <p class="ranking-footnote">排行描述截至資料日的歷史行情，並非買賣建議。僅比較新臺幣標的；缺漏、無有效當日行情或公司行動影響的指標不納入相關排行。</p>
+        </div>
+      </div>
     </section>
     <details class="legacy-research" hidden><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">

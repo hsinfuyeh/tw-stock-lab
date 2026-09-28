@@ -33,6 +33,16 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as ctx:urlopen(req)
         self.assertEqual(ctx.exception.code,400)
         self.assertEqual(self.service.settings()["min_probability"],.6)
+    def test_explore_uses_latest_snapshot_and_keeps_stale_security_searchable(self):
+        self.service.store.save_snapshot(dict(id='old',as_of='2026-09-14',created_at='old',rows=[]))
+        self.service.store.save_snapshot(dict(id='new',as_of='2026-09-15',created_at='new',
+            rows=[dict(symbol='2330',name='台積電',kind='stock',currency='TWD',
+                       bars=[dict(date='2026-09-14',close=100,valid=True)])]))
+        with urlopen(self.base+"/api/explore") as response: payload=json.load(response)
+        self.assertEqual((payload['id'],payload['as_of']),('new','2026-09-15'))
+        self.assertEqual(payload['rows'][0]['symbol'],'2330')
+        self.assertIsNone(payload['rows'][0]['detail_url'])
+        self.assertEqual(payload['rows'][0]['metrics'],{})
     def test_cross_origin_cannot_change_settings(self):
         req=Request(self.base+"/api/settings",b"{}",{"Content-Type":"application/json","Origin":"https://example.com"})
         with self.assertRaises(HTTPError) as ctx:urlopen(req)

@@ -1,6 +1,47 @@
 export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
 export const PAGE_SIZE = 15;
 
+export function searchSecurities(rows, query) {
+  const clean = value => String(value || '').normalize('NFKC').replaceAll('臺', '台').toLowerCase().trim();
+  const q = clean(query);
+  return rows.filter(row => clean(row.symbol).includes(q) || clean(row.name).includes(q))
+    .sort((a,b) => Number(clean(b.symbol) === q) - Number(clean(a.symbol) === q) || String(a.symbol).localeCompare(String(b.symbol)));
+}
+
+export const MARKET_RANKS = {
+  amount: {label:'成交金額', metric:'turnover', unit:'amount', note:'依當日成交金額由高到低排序。'},
+  gainers: {label:'漲最多', metric:'change_pct', unit:'percent', note:'依相較前一交易日的收盤漲幅排序；只列上漲標的。'},
+  losers: {label:'跌最多', metric:'change_pct', unit:'percent', ascending:true, note:'依相較前一交易日的收盤跌幅排序；只列下跌標的。'},
+  volume: {label:'量暴增', metric:'relative_volume', unit:'ratio', note:'當日成交量至少為前 20 交易日平均的 1.5 倍，依倍數排序。'},
+  high20: {label:'創 20 日新高', metric:'momentum20_pct', unit:'percent', note:'收盤價高於前 20 交易日最高價，依近 20 日漲幅排序。'},
+  low20: {label:'創 20 日新低', metric:'momentum20_pct', unit:'percent', ascending:true, note:'收盤價低於前 20 交易日最低價，依近 20 日跌幅排序。'},
+  quiet: {label:'波動小', metric:'volatility_pct', unit:'percent', ascending:true, note:'依近 20 個日報酬的標準差由低到高排序；波動小不代表低風險或成交容易。'},
+};
+
+export function rankMarketRows(rows, key) {
+  const config = MARKET_RANKS[key];
+  if (!config) return [];
+  return rows.filter(row => {
+    const m = row.metrics || {};
+    if (row.currency && row.currency !== 'TWD') return false;
+    if (finiteNumber(m[config.metric]) === null) return false;
+    if (key === 'gainers') return m.change_pct > 0;
+    if (key === 'losers') return m.change_pct < 0;
+    if (key === 'volume') return m.relative_volume >= 1.5;
+    if (key === 'high20') return m.new_high20 === true;
+    if (key === 'low20') return m.new_low20 === true;
+    return true;
+  }).sort((a,b) => (config.ascending ? 1 : -1) * (a.metrics[config.metric] - b.metrics[config.metric])
+    || String(a.symbol).localeCompare(String(b.symbol)));
+}
+
+export function paginateExplorer(rows, requested = 1) {
+  const pages = Math.max(1, Math.ceil(rows.length / 10));
+  const page = Math.min(pages, Math.max(1, Number.isFinite(requested) ? Math.trunc(requested) : 1));
+  const start = (page-1)*10;
+  return {rows:rows.slice(start,start+10),page,pages,start};
+}
+
 export function twoWeekRows(report) {
   if (report?.status === 'validated') return { label: '符合樣本外驗證門檻的觀察名單', rows: (report.recommendations || []).slice(0, 10) };
   return { label: '量價排序觀察名單 · 樣本外驗證尚未完成', rows: (report?.research_candidates || []).slice(0, 10) };
@@ -29,7 +70,7 @@ export function twoWeekTableMarkup(report) {
   return `<table class="two-week-results"><thead><tr>
     <th scope="col">排序</th><th scope="col">標的</th><th scope="col">盤後收盤價</th>
     <th scope="col">近 5 日</th><th scope="col">近 20 日</th><th scope="col">相對量能</th>
-    <th scope="col">近 20 交易日收盤走勢</th><th scope="col">量價訊號</th>${showRate ? '<th scope="col">組別保守達標率估計</th>' : ''}
+    <th scope="col">近 20 交易日收盤走勢</th><th scope="col">量價訊號</th>${showRate ? '<th scope="col">組別保守達標率估計</th>' : ''}<th scope="col">個股資訊</th>
   </tr></thead><tbody>${rows.map((row, index) => {
     const reasons = [...new Set((Array.isArray(row.reasons) ? row.reasons : []).filter(Boolean))];
     const tags = reasons.slice(0, 2).map((reason) => `<span class="signal-tag">${escapeHtml(reason)}</span>`).join('')
@@ -52,6 +93,7 @@ export function twoWeekTableMarkup(report) {
           <ul>${allReasons}</ul>
         </details></td>
       ${showRate ? `<td class="group-rate" data-label="組別保守達標率估計">${formatPercent(row.probability, true)}</td>` : ''}
+      <td class="explore-action" data-label="個股資訊"><button class="button button-quiet" type="button" data-detail-symbol="${escapeHtml(row.symbol)}">個股詳情</button></td>
     </tr>`;
   }).join('')}</tbody></table>`;
 }
@@ -114,6 +156,7 @@ export function dataURL(staticMode, route, params = {}) {
   if (!staticMode) return `/api/${route}${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`;
   const id = encodeURIComponent(params.id || '');
   if (route === 'state') return './data/home.json';
+  if (route === 'explore') return './data/explore.json';
   if (route === 'snapshot') return `./data/snapshots/${id}.json`;
   if (route === 'export') return `./data/csv/${id}-${params.horizon}-${params.sort}.csv`;
   throw new Error('雲端網頁只提供已發布的研究資料');
@@ -169,6 +212,8 @@ const METRICS = {
 };
 
 const appState = {
+  view: 'home', catalog: [], catalogId: null, catalogLoading: null, catalogError: '',
+  homeQuery: '', homePage: 1, rankKey: 'amount', rankPage: 1,
   snapshot: null,
   settings: null,
   history: [],
@@ -475,6 +520,7 @@ function renderAll() {
   renderSnapshotHeader();
   renderJob();
   renderTwoWeek();
+  renderView();
   if (!STATIC_MODE) {
     renderHistory();
     renderRows();
@@ -498,6 +544,11 @@ async function loadState({ quiet = false } = {}) {
     appState.nextSession = payload.next_session;
     appState.schedule = payload.schedule || '';
     appState.settings = payload.settings ?? appState.settings;
+    if (appState.snapshot?.id !== payload.latest?.id) {
+      appState.catalog = []; appState.catalogId = null; appState.catalogError = '';
+      appState.homePage = 1; appState.rankPage = 1;
+      detailLoader.invalidate();
+    }
     appState.snapshot = payload.latest ?? null;
     appState.history = payload.history ?? [];
     appState.twoWeekOutcomes = payload.two_week_outcomes ?? [];
@@ -653,9 +704,99 @@ function calibrationText(calibration) {
   return calibration.map((bucket) => `n=${formatInteger(bucket.n)}：估計 ${formatPercent(bucket.predicted, true)}／實際 ${formatPercent(bucket.actual, true)}`).join('；');
 }
 
+async function ensureCatalog() {
+  const snapshotId = appState.snapshot?.id;
+  if (!snapshotId || appState.catalogId === snapshotId) return;
+  if (appState.catalogLoading) return appState.catalogLoading;
+  appState.catalogError = '';
+  appState.catalogLoading = (async () => {
+    try {
+      const payload = await fetchJSON(dataURL(STATIC_MODE, 'explore'));
+      if (appState.snapshot?.id !== snapshotId) return;
+      if (payload.id !== snapshotId || payload.as_of !== appState.snapshot.as_of || !Array.isArray(payload.rows)) {
+        throw new Error('個股資料與報告版本不一致，請重新讀取報告。');
+      }
+      appState.catalog = payload.rows; appState.catalogId = payload.id;
+    } catch (error) { appState.catalogError = error.message; }
+    finally {
+      appState.catalogLoading = null; renderExplorer();
+      if (appState.snapshot?.id !== snapshotId && appState.view !== 'today') ensureCatalog();
+    }
+  })();
+  return appState.catalogLoading;
+}
+
+function renderView() {
+  const views = {
+    home: ['個股探索', '搜尋上市股票與股票型 ETF，查看盤後行情、近期走勢與分析資訊。'],
+    today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
+    rankings: ['其他排行', '從成交金額、漲跌、量能與波動，探索同一資料日的市場表現。'],
+  };
+  appState.view = Object.hasOwn(views, location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  const [title, copy] = views[appState.view];
+  $('#pageTitle').textContent = title;
+  $('.hero .lede').textContent = copy;
+  document.title = `${title} · 臺股研究台`;
+  $$('[data-view]').forEach(el => { el.hidden = el.dataset.view !== appState.view; });
+  $$('[data-view-link]').forEach(el => {
+    if (el.dataset.viewLink === appState.view) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  });
+  renderExplorer();
+  if (appState.view !== 'today') ensureCatalog();
+}
+
+function exploreTable(rows, start, rankConfig = null) {
+  if (!rows.length) return '<div class="explore-empty">沒有符合條件的標的，請試試其他名稱或排行。</div>';
+  const primary = rankConfig ? rankConfig.unit === 'amount' ? '當日成交金額' : rankConfig.unit === 'ratio' ? '相對量能' : rankConfig.metric === 'volatility_pct' ? '日報酬標準差' : rankConfig.metric === 'momentum20_pct' ? '近 20 日' : '當日漲跌' : '當日漲跌';
+  const valueText = row => {
+    const v = row.metrics?.[rankConfig?.metric || 'change_pct'];
+    if (finiteNumber(v) === null) return '—';
+    if (rankConfig?.unit === 'amount') return `${formatDecimal(v / 100000000, 2)} 億`;
+    if (rankConfig?.unit === 'ratio') return `${formatDecimal(v, 2)} 倍`;
+    if (rankConfig?.metric === 'volatility_pct') return `${formatDecimal(v, 2)}%`;
+    return formatPercent(v);
+  };
+  return `<div class="table-shell"><table class="explore-table"><thead><tr><th scope="col">排序</th><th scope="col">標的</th><th scope="col">盤後收盤價</th><th scope="col">${primary}</th><th scope="col">近 20 交易日走勢</th><th scope="col">個股資訊</th></tr></thead><tbody>${rows.map((row,i) => `<tr>
+    <td class="rank" data-label="排序">${start+i+1}</td>
+    <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${kindLabel(row.kind)}</small></div>${row.data_as_of !== appState.snapshot?.as_of ? `<small class="stale-security">行情日 ${escapeHtml(row.data_as_of || '無資料')} · 當日無有效行情</small>` : ''}</td>
+    <td class="close-cell" data-label="盤後收盤價">${formatDecimal(row.metrics?.close,2)}</td>
+    <td class="metric-cell${!rankConfig || rankConfig.unit === 'percent' && rankConfig.metric !== 'volatility_pct' ? ` ${toneClass(row.metrics?.[rankConfig?.metric || 'change_pct'])}` : ''}" data-label="${primary}">${valueText(row)}</td>
+    <td class="trend-cell" data-label="近 20 交易日走勢">${trendMarkup(row.trend)}</td>
+    <td class="explore-action" data-label="個股資訊"><button class="button button-quiet" type="button" data-detail-symbol="${escapeHtml(row.symbol)}">個股詳情</button></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderExplorer() {
+  $('#catalogCount').textContent = appState.catalogId ? `${appState.catalog.length} 檔標的` : '個股資料';
+  const ready = appState.catalogId === appState.snapshot?.id && !!appState.catalogId;
+  const status = appState.catalogError || (!appState.snapshot ? '尚無盤後報告，請先取得研究資料。' : '正在讀取個股資料…');
+  const config = MARKET_RANKS[appState.rankKey];
+  $('#marketRankNav').innerHTML = Object.entries(MARKET_RANKS).map(([key,value]) => `<button type="button" data-market-rank="${key}" aria-pressed="${key === appState.rankKey}">${value.label}</button>`).join('');
+  $('#marketRankTitle').textContent = config.label;
+  $('#marketRankNote').textContent = config.note;
+  for (const isHome of [true,false]) {
+    const rows = isHome ? searchSecurities(appState.catalog,appState.homeQuery) : rankMarketRows(appState.catalog,appState.rankKey);
+    const paged = paginateExplorer(rows, isHome ? appState.homePage : appState.rankPage);
+    if (isHome) appState.homePage = paged.page; else appState.rankPage = paged.page;
+    const prefix = isHome ? 'home' : 'rank';
+    const summary = isHome ? $('#homeSummary') : $('#marketRankSummary');
+    summary.textContent = ready ? `${appState.snapshot.as_of} · 共 ${rows.length} 檔${isHome && !appState.homeQuery ? ' · 依代號排列，非推薦順序' : ''} · 每頁最多 10 檔` : status;
+    (isHome ? $('#homeResults') : $('#marketRankResults')).innerHTML = ready ? exploreTable(paged.rows,paged.start,isHome ? null : config) : '';
+    $(`#${prefix}Pager`).hidden = !ready || !rows.length;
+    $(`#${prefix}PageText`).textContent = `第 ${paged.page} / ${paged.pages} 頁`;
+    $(`#${prefix}Prev`).disabled = paged.page === 1;
+    $(`#${prefix}Next`).disabled = paged.page === paged.pages;
+  }
+}
+
 async function openDetail(symbol) {
   let row = appState.snapshot?.rows?.find((item) => String(item.symbol) === String(symbol));
-  if (!row) return;
+  if (!row) {
+    await ensureCatalog();
+    row = appState.catalog.find(item => String(item.symbol) === String(symbol));
+  }
+  if (!row) { showError(appState.catalogError || '找不到這檔個股的資料。'); return; }
   try {
     row = await detailLoader.load(row);
     if (!row) return;
@@ -666,7 +807,7 @@ async function openDetail(symbol) {
   const reasons = [...new Set([...(Array.isArray(row.reasons) ? row.reasons : []), ...(Array.isArray(horizon?.reasons) ? horizon.reasons : [])])];
   const signals = Array.isArray(row.signals) ? row.signals : [];
   const samples = Array.isArray(horizon?.samples) ? horizon.samples : [];
-  $('#detailKind').textContent = `${kindLabel(row.kind)} · ${appState.horizon} 曆日研究`;
+  $('#detailKind').textContent = `${kindLabel(row.kind)} · 個股資訊`;
   $('#detailTitle').textContent = `${row.symbol} ${row.name || ''}`.trim();
   $('#detailSubtitle').textContent = `研究日 ${formatDate(row.as_of || appState.snapshot?.as_of)} · 行情日 ${formatDate(row.data_as_of || row.bars?.at(-1)?.date)} · ${row.currency || 'TWD'} · ${horizon?.target_date ? `目標交易日 ${formatDate(horizon.target_date)}` : '目標日尚未確定'}`;
   const samplesHtml = samples.length ? `<div class="table-shell"><table class="sample-table"><thead><tr><th>訊號日</th><th>模擬進場日</th><th>模擬出場日</th><th>成本後報酬</th><th>期間收盤曾回正</th></tr></thead><tbody>${samples.map((sample) => `<tr><td>${escapeHtml(sample.signal_date || '—')}</td><td>${escapeHtml(sample.entry_date || '—')}</td><td>${escapeHtml(sample.exit_date || '—')}</td><td class="numeric ${toneClass(sample.return_pct)}">${formatPercent(sample.return_pct)}</td><td>${sample.recovered === true ? '是' : sample.recovered === false ? '否' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="notice"><p>此期限尚無可顯示的歷史樣本日期。</p></div>';
@@ -679,6 +820,13 @@ async function openDetail(symbol) {
     <p class="calibration">${escapeHtml(calibrationText(validation.calibration))}</p>
   </div>` : '<div class="notice"><p>尚無此期限的時間前推檢查結果，不以 0 補值。</p></div>';
   $('#detailContent').innerHTML = `
+    <div class="detail-stat-grid market-detail-stats">
+      <div class="detail-stat"><small>盤後收盤價</small><b>${formatDecimal(row.bars?.at(-1)?.close,2)}</b></div>
+      <div class="detail-stat"><small>近 5 日</small><b>${formatPercent(row.features?.momentum5)}</b></div>
+      <div class="detail-stat"><small>近 20 日</small><b>${formatPercent(row.features?.momentum20)}</b></div>
+      <div class="detail-stat"><small>相對量能</small><b>${formatDecimal(row.features?.volume_ratio,2)} 倍</b></div>
+    </div>
+    <p class="search-hint">以下歷史情境分析採 ${appState.horizon} 曆日期限，與今日名單的十個交易日觀察期不同。</p>
     <div class="detail-stat-grid">
       <div class="detail-stat"><small>樣本平均淨報酬</small><b class="${toneClass(horizon?.expected_return)}">${formatPercent(horizon?.expected_return)}</b></div>
       <div class="detail-stat"><small>樣本到期正報酬率</small><b>${formatPercent(horizon?.p_positive, true)}</b></div>
@@ -694,6 +842,24 @@ async function openDetail(symbol) {
 }
 
 function bindEvents() {
+  window.addEventListener('hashchange', renderView);
+  $('#stockSearch').addEventListener('input', event => {
+    appState.homeQuery = event.target.value; appState.homePage = 1; renderExplorer();
+  });
+  $('#marketRankNav').addEventListener('click', event => {
+    const button = event.target.closest('[data-market-rank]');
+    if (!button) return;
+    appState.rankKey = button.dataset.marketRank; appState.rankPage = 1; renderExplorer();
+  });
+  for (const prefix of ['home','rank']) for (const [suffix,delta] of [['Prev',-1],['Next',1]]) {
+    $(`#${prefix}${suffix}`).addEventListener('click', () => {
+      appState[prefix === 'home' ? 'homePage' : 'rankPage'] += delta; renderExplorer();
+    });
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-detail-symbol]');
+    if (button) openDetail(button.dataset.detailSymbol);
+  });
   const popovers = $$('.info-popover');
   popovers.forEach((popover) => popover.addEventListener('toggle', () => {
     popover.classList.toggle('is-dismissed', !popover.open);
@@ -747,10 +913,6 @@ function bindEvents() {
   $('#kindSelect').addEventListener('change', event => changeRanking({ kind: event.target.value }));
   $('#eligibilitySelect').addEventListener('change', event => changeRanking({ eligibility: event.target.value }));
   $('#positiveAllCheck').addEventListener('change', event => changeRanking({ positiveAll: event.target.checked }));
-  $('#resultsBody').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-detail-symbol]');
-    if (button) openDetail(button.dataset.detailSymbol);
-  });
   $$('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => $(`#${button.dataset.closeDialog}`).close()));
   for (const dialog of [$('#detailDialog'), $('#settingsDialog')]) {
     dialog.addEventListener('click', (event) => {

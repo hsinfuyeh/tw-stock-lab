@@ -74,6 +74,10 @@ class PublishTests(unittest.TestCase):
             out=Path(root)/'dist'
             self.publish()(service,out)
             home=json.loads((out/'data/home.json').read_text(encoding='utf-8'))
+            explore=json.loads((out/'data/explore.json').read_text(encoding='utf-8'))
+            self.assertEqual((explore['id'],explore['as_of']),(snap['id'],snap['as_of']))
+            self.assertEqual(explore['rows'][0]['symbol'],snap['rows'][0]['symbol'])
+            self.assertEqual(json.loads((out/explore['rows'][0]['detail_url']).read_text(encoding='utf-8')),snap['rows'][0])
             row=home['latest']['two_week']['research_candidates'][0]
             self.assertEqual(row['close'],price_rows[-1]['close'])
             self.assertEqual(len(row['trend']),20)
