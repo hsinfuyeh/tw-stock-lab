@@ -1,0 +1,15 @@
+name = "tw-stock-lab-update"
+main = "worker.mjs"
+compatibility_date = "2026-09-29"
+
+[vars]
+SITE_ORIGIN = "https://hsinfuyeh.github.io"
+GITHUB_REPOSITORY = "hsinfuyeh/tw-stock-lab"
+
+[[durable_objects.bindings]]
+name = "COORDINATOR"
+class_name = "UpdateCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UpdateCoordinator"]

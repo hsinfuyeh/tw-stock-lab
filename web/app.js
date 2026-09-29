@@ -489,7 +489,7 @@ function renderRows() {
 function renderJob() {
   const job = appState.job;
   const panel = $('#jobPanel');
-  if (STATIC_MODE) {
+  if (STATIC_MODE && !cloudClient) {
     panel.hidden = true;
     setUpdateButtons(false);
     return;
@@ -515,7 +515,7 @@ function setUpdateButtons(running) {
   for (const button of [$('#updateButton'), $('#emptyUpdateButton')]) {
     if (!button) continue;
     button.disabled = running;
-    if (button.id === 'updateButton') button.querySelector('.button-label').textContent = STATIC_MODE ? '讀取雲端報告' : running ? '更新行情中' : '更新行情資料';
+    if (button.id === 'updateButton') button.querySelector('.button-label').textContent = STATIC_MODE ? cloudClient ? running ? '雲端更新中' : '雲端更新行情' : '讀取雲端報告' : running ? '更新行情中' : '更新行情資料';
   }
 }
 
@@ -536,8 +536,8 @@ function schedulePoll() {
   if (!appState.job?.running) return;
   appState.pollTimer = setTimeout(async () => {
     try {
-      const payload = await fetchJSON('/api/job');
-      appState.job = payload.job;
+      const nextJob = STATIC_MODE ? await cloudClient.status() : (await fetchJSON('/api/job')).job;
+      appState.job = STATIC_MODE && nextJob.scope==='social' ? null : nextJob;
       renderJob();
       if (appState.job?.running) schedulePoll();
       else await loadState({ quiet: true });
@@ -545,7 +545,7 @@ function schedulePoll() {
       showError(error.message);
       schedulePoll();
     }
-  }, 1400);
+  }, STATIC_MODE ? 15000 : 1400);
 }
 
 async function loadState({ quiet = false } = {}) {
@@ -564,11 +564,16 @@ async function loadState({ quiet = false } = {}) {
     appState.snapshot = payload.latest ?? null;
     appState.history = payload.history ?? [];
     appState.twoWeekOutcomes = payload.two_week_outcomes ?? [];
-    appState.job = payload.job ?? null;
+    let cloudStatusError='';
+    if (STATIC_MODE && cloudClient) {
+      try { const job=await cloudClient.status();appState.job=job.scope==='social'?null:job; }
+      catch(error){appState.job=null;cloudStatusError=`雲端進度暫時無法讀取：${error.message}`;}
+    } else appState.job=payload.job??null;
     appState.universe = payload.universe ?? [];
     clearError();
     renderAll();
     schedulePoll();
+    if (cloudStatusError) showError(cloudStatusError);
     return true;
   } catch (error) {
     showError(error.message);
@@ -578,6 +583,14 @@ async function loadState({ quiet = false } = {}) {
 }
 
 async function startUpdate() {
+  if (STATIC_MODE && cloudClient) {
+    setUpdateButtons(true);
+    try {
+      appState.job = await cloudClient.start('market','7d');
+      renderJob(); schedulePoll();
+    } catch (error) { showError(error.message); setUpdateButtons(false); }
+    return;
+  }
   if (STATIC_MODE) {
     setUpdateButtons(true);
     try {
@@ -765,7 +778,11 @@ function renderView() {
 
 let socialViewPromise;
 async function loadSocialView() {
-  if (!socialViewPromise) socialViewPromise = import('./social.js').then(({createSocialView}) => createSocialView($('#socialView'), () => fetchJSON(dataURL(STATIC_MODE,'social')), STATIC_MODE?null:{
+  if (!socialViewPromise) socialViewPromise = import('./social.js').then(({createSocialView}) => createSocialView($('#socialView'), () => fetchJSON(dataURL(STATIC_MODE,'social')), STATIC_MODE?cloudClient?{
+    cloud:true,pollDelay:15000,
+    start:window=>cloudClient.start('social',window),
+    status:async()=>{const job=await cloudClient.status();return job.scope==='social'?job:{running:false,status:'idle',sources:{}};}
+  }:null:{
     start:async window=>(await fetchJSON('/api/social/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({window})})).job,
     status:async()=>(await fetchJSON('/api/social/job')).job
   }));
@@ -957,7 +974,18 @@ function bindEvents() {
   }
 }
 
-function init() {
+let cloudClient = null;
+function requestCloudKey() {
+  const dialog=$('#cloudAuthDialog'),form=$('#cloudAuthForm'),input=$('#cloudUpdatePassword');
+  return new Promise(resolve=>{
+    let value=null;
+    const submit=event=>{event.preventDefault();value=input.value;dialog.close();};
+    const close=()=>{form.removeEventListener('submit',submit);input.value='';resolve(value);};
+    form.addEventListener('submit',submit);dialog.addEventListener('close',close,{once:true});
+    dialog.showModal();input.focus();
+  });
+}
+async function init() {
   $('#cloudUpdateLink').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
     document.body.classList.add('static-mode');
@@ -966,6 +994,16 @@ function init() {
     $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
     $('#emptyUpdateButton').textContent = '讀取最新報告';
     $('#exportLink').hidden = true;
+    try {
+      const config=await fetchJSON('./cloud-config.json');
+      if(config.endpoint){
+        const {createCloudClient}=await import('./cloud.js');
+        cloudClient=createCloudClient(config.endpoint,requestCloudKey,fetchJSON,window.sessionStorage);
+        $('#updateButton .button-label').textContent='雲端更新行情';
+        $('#updateButton').title='啟動雲端行情更新，完成發布後自動讀取新資料';
+        $('#emptyUpdateButton').textContent='啟動雲端更新';
+      }
+    }catch(error){showError(`雲端更新設定載入失敗：${error.message}`);}
   } else {
     $('#updateButton .button-label').textContent = '更新行情資料';
     $('#updateButton').title = '立即向官方來源確認並取得行情資料，完成後更新研究結果';

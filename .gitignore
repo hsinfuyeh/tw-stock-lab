@@ -7,3 +7,6 @@ dist/
 *.zip
 *.tar.gz
 .env*
+.dev.vars*
+.wrangler/
+node_modules/

@@ -23,21 +23,21 @@ export function createSocialUpdater(api,onJob,onDone,onError,schedule=setTimeout
   let busy=false,retries=0;
   async function accept(job){
     onJob(job);
-    if(job.running){schedule(poll,1500);return;}
+    if(job.running){schedule(poll,api.pollDelay||1500);return;}
     busy=false;await onDone();
   }
   async function poll(){
     try{const job=await api.status();retries=0;await accept(job);}
-    catch{if(++retries<=3)schedule(poll,3000);else{busy=false;onJob({running:false,status:'failed'});onError('無法確認收集狀態；本機服務可能已停止。重新連線後可再次讀取進度。');}}
+    catch(error){if(++retries<=3)schedule(poll,api.pollDelay||3000);else{busy=false;onJob({running:false,status:'failed'});onError(error.message||'無法確認收集狀態，請重新連線後再次讀取進度。');}}
   }
   return {async start(window){
     if(busy)return;busy=true;retries=0;onJob({running:true,status:'starting',sources:{}});
     try{await accept(await api.start(window));}
-    catch{busy=false;onJob({running:false,status:'failed'});onError('無法啟動收集，請確認本機資料服務仍在執行。');}
+    catch(error){busy=false;onJob({running:false,status:'failed'});onError(error.message||'無法啟動收集，請確認更新服務仍在執行。');}
   },async resume(){
     if(busy)return;
-    try{const job=await api.status();onJob(job);if(job.running){busy=true;schedule(poll,1500);}}
-    catch{onError('無法讀取本機社群收集狀態。');}
+    try{const job=await api.status();onJob(job);if(job.running){busy=true;schedule(poll,api.pollDelay||1500);}}
+    catch(error){onError(error.message||'無法讀取社群收集狀態。');}
   }};
 }
 
@@ -63,13 +63,13 @@ export function createSocialView(root,fetcher,api=null){
     $('[data-social-stale]').hidden=!collected||Date.now()-collected<30*3600000;
     const button=$('[data-social-update]');
     button.disabled=!updater||job.running;
-    button.textContent=job.running?'正在收集…':'立即更新社群';
+    button.textContent=job.running?'正在收集…':!updater?'雲端更新待設定':api.cloud?'雲端更新社群':'立即更新社群';
     $('[data-social-window]').disabled=job.running;
     const progress=$('[data-social-job]');
-    progress.textContent=!updater?'即時抓取需使用本機版；線上頁面只讀取已發布結果。':
-      job.running?`${job.window==='7d'?'近 7 天':job.window==='24h'?'近 24 小時':'正在啟動'} · ${Object.entries(job.sources||{}).map(([key,s])=>`${names[key]}：${statuses[s.status]||s.status}`).join(' · ')}`:
+    progress.textContent=!updater?'雲端觸發服務尚未接通，目前由每日排程更新；也可使用下方「執行更新／查看進度」至 GitHub 手動啟動。':
+      job.running?`${job.window==='7d'?'近 7 天':job.window==='24h'?'近 24 小時':'正在啟動'} · ${job.message||Object.entries(job.sources||{}).map(([key,s])=>`${names[key]}：${statuses[s.status]||s.status}`).join(' · ')}`:
       job.finished_at?`${job.status==='failed'?'收集未完成，保留先前結果':'收集完成'} · ${date(job.finished_at)}${job.status==='partial'?' · 部分來源未取得完整資料，請查看各平台狀態':''}${job.status==='failed'?` · ${Object.entries(job.sources||{}).map(([key,s])=>`${names[key]}：${statuses[s.status]||s.status}${s.error?`（${s.error}）`:''}`).join(' · ')}`:''}${job.error?` · ${job.error}`:''}`:
-      '按下後立即向來源收集所選期間；可能需要數分鐘。Dcard 重新嘗試公開 API，Threads 不使用個人帳號。';
+      api.cloud?'按下後啟動雲端收集與發布，可關閉電腦；完成後自動讀取新排行。Dcard 可能拒絕請求，Threads 公開搜尋尚未接通。':'按下後立即向來源收集所選期間；可能需要數分鐘。Dcard 重新嘗試公開 API，Threads 不使用個人帳號。';
   }
   root.addEventListener('change',event=>{
     if(event.target.matches('[data-social-window]')) windowKey=event.target.value;

@@ -15,8 +15,10 @@ def export_site(service,output):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     for source in (Path(__file__).resolve().parents[1]/'web').iterdir():
         if source.is_file(): shutil.copyfile(source,output/source.name)
-    social_version=hashlib.sha256((output/'social.js').read_bytes()).hexdigest()[:12]
-    app=(output/'app.js').read_text(encoding='utf-8').replace("import('./social.js')",f"import('./social.js?v={social_version}')")
+    app=(output/'app.js').read_text(encoding='utf-8')
+    for module in ('social.js','cloud.js'):
+        version=hashlib.sha256((output/module).read_bytes()).hexdigest()[:12]
+        app=app.replace(f"import('./{module}')",f"import('./{module}?v={version}')")
     (output/'app.js').write_text(app,encoding='utf-8')
     html=(output/'index.html').read_text(encoding='utf-8')
     html=html.replace('<head>','<head>\n  <meta name="deployment-mode" content="static">',1)

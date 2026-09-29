@@ -1,9 +1,21 @@
 name: Daily market research and Pages
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0} · {1}', inputs.scope, inputs.window) || 'Scheduled / published market update' }}
 on:
   schedule:
     - cron: '15 11 * * *'
     - cron: '47 14 * * *'
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 更新類型
+        type: choice
+        options: [all, market, social]
+        default: all
+      window:
+        description: 社群統計期間
+        type: choice
+        options: [24h, 7d]
+        default: 7d
   push:
     branches: [main]
 permissions:
@@ -33,7 +45,7 @@ jobs:
       - name: Verify calculations and UI
         run: |
           python -m unittest discover -s tests -v
-          node --test tests/ui.test.mjs
+          node --test tests/*.test.mjs
       - uses: actions/cache/restore@v4
         id: cache
         with:
@@ -54,24 +66,39 @@ jobs:
             python scripts/state_archive.py restore _restore/market-state.tar.gz
           fi
       - name: Update official data, analyze full universe, build site
-        run: python cloud_update.py --workers 2
+        env:
+          UPDATE_SCOPE: ${{ inputs.scope || 'all' }}
+        run: |
+          if [ "$UPDATE_SCOPE" = "social" ]; then
+            python cloud_update.py --export-only
+          else
+            python cloud_update.py --workers 2
+          fi
       - name: Collect public social observations
-        continue-on-error: true
+        if: inputs.scope != 'market'
+        continue-on-error: ${{ github.event_name != 'workflow_dispatch' }}
         timeout-minutes: 8
         env:
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-        run: python social_update.py --skip-dcard
+          UPDATE_SCOPE: ${{ inputs.scope || 'all' }}
+          UPDATE_WINDOW: ${{ inputs.window || '7d' }}
+          UPDATE_EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$UPDATE_EVENT" = "workflow_dispatch" ]; then
+            python social_update.py --window "$UPDATE_WINDOW" --public-threads
+          else
+            python social_update.py --skip-dcard --public-threads
+          fi
       - name: Save resumable data cache
-        if: always()
+        if: success()
         uses: actions/cache/save@v4
         with:
           path: data
           key: market-v1-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Archive public research state
-        if: always()
+        if: success()
         run: python scripts/state_archive.py pack market-state.tar.gz
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: public-market-state
           path: market-state.tar.gz

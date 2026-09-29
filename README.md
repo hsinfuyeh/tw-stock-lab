@@ -68,7 +68,7 @@ Python 3.12+、Node 22+：
 ```sh
 pip install -r requirements.txt
 python -m unittest discover -s tests -v
-node --test tests/ui.test.mjs
+node --test tests/*.test.mjs
 python cloud_update.py
 python -m http.server 8767 --directory dist --bind 127.0.0.1
 ```
@@ -81,4 +81,6 @@ python -m http.server 8767 --directory dist --bind 127.0.0.1
 
 社群頁面的「立即更新社群」獨立啟動本機背景工作，按目前選擇的24小時／7天時間窗收集，顯示各平台進度，完成後自動刷新排行。重複點擊不會建立第二個工作。PTT 抓公開主文；手動更新會重新嘗試 Dcard 公開 API，若403則顯示失敗；Threads未登入公開搜尋尚未接通，明示來源未接通，不使用個人帳號、Cookie或環境內的官方 token。按鈕無法解除來源限制，來源錯誤不算零篇，掃描上限仍適用。
 
-GitHub Pages 的「讀取雲端報告」只是讀取已發布資料；社群即時按鈕在靜態頁停用並提示使用本機版。用 `python -m http.server` 開啟 dist 仍是靜態版，沒有抓取 API。Dcard 雲端排程維持暫緩，本機手動更新則重新嘗試。
+GitHub Pages 可透過 Cloudflare 免費觸發服務啟動雲端更新；設定與部署步驟見[雲端更新串接](docs/cloud-update-setup.md)。服務網址未設定前，行情按鈕仍只讀取已發布報告，社群按鈕顯示「雲端更新待設定」。設定後會顯示「雲端更新行情／社群」，輸入專用更新密碼可啟動 GitHub Actions，15秒查詢進度，發布完成後自動重讀；電腦可關機。GitHub授權僅存Cloudflare Secret，網站不保存更新密碼。
+
+`python -m http.server` 開啟 dist 仍是靜態網站；是否能觸發取決於設定的雲端服務及允許的網站來源。Dcard 每日排程維持暫緩，手動雲端或本機更新則重新嘗試。Threads雲端也只使用未登入公開路線，目前未接通，不使用個人帳號或官方 token。

@@ -79,7 +79,7 @@ def collect_ptt(stocks,current,fetch=fetch_public,max_pages=12,max_posts=150,sin
                     if since<=timestamp(post['published_at'])<=current: posts.append(post)
                 except Exception: errors+=1
                 time.sleep(.15)
-        status='partial' if posts else 'failed' if errors else 'partial'
+        status='failed' if not seen or errors==len(seen) else 'partial'
         return posts,dict(status=status,scanned=len(seen),pages=pages,errors=errors,
             scope=f'PTT Stock 主文；最近至多 {max_pages} 頁／{max_posts} 篇，最多 5 分鐘，不含推文；屬有限取樣。')
     except Exception as exc:

@@ -51,8 +51,10 @@ def main():
     parser.add_argument('--data-dir',default='data')
     parser.add_argument('--output',default='dist/data/social.json')
     parser.add_argument('--skip-dcard',action='store_true',help='暫緩 Dcard 收集並顯示停用狀態')
+    parser.add_argument('--window',choices=['24h','7d'],default='7d')
+    parser.add_argument('--public-threads',action='store_true',help='只使用未登入公開路線，不使用 Threads Token')
     args=parser.parse_args()
-    report=update_social(MarketService(args.data_dir),skip_dcard=args.skip_dcard)
+    report=update_social(MarketService(args.data_dir),skip_dcard=args.skip_dcard,window=args.window,local_public=args.public_threads)
     atomic_json(args.output,report)
 
 
