@@ -16,6 +16,54 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(identify('2026/11/01',self.stocks),[])
         self.assertEqual(identify('股票市值 2330.50 元，部位2317張',self.stocks),[])
 
+    def test_common_words_require_specific_company_evidence(self):
+        stocks=self.stocks+[dict(symbol='3167',name='大量'),dict(symbol='9907',name='統一實'),
+            dict(symbol='1216',name='統一'),dict(symbol='2498',name='宏達電'),dict(symbol='2497',name='怡利電')]
+        for text in ['台積電大量買超，投資人買進大量股票','台股採用全新材料，大量資源排擠',
+                     '股票研究要精確預估，統一資料格式','台積電新聞由聯合報整理','統一實營收成長']:
+            self.assertNotIn('3167',identify(text,stocks))
+            self.assertNotIn('1216',identify(text,stocks))
+        self.assertEqual(identify('大量股價漲停，3167',stocks),['3167'])
+        self.assertEqual(identify('[標的] 大量，營收成長',stocks),['3167'])
+        self.assertEqual(identify('統一營收及台積電展望',stocks),['1216','2330'])
+        self.assertEqual(identify('股票3167',stocks),['3167'])
+
+    def test_generic_financial_language_is_not_a_company_mention(self):
+        stocks=[dict(symbol='9921',name='巨大'),dict(symbol='9937',name='全國'),dict(symbol='8201',name='無敵'),dict(symbol='8112',name='至上')]
+        self.assertEqual(identify('台股出現巨大波動，全國投資人都在關注，股票策略無敵，風險管理至上',stocks),[])
+        self.assertEqual(identify('巨大營收下滑，全國股價穩定',stocks),['9921','9937'])
+
+    def test_disabled_dcard_is_not_requested_and_old_mentions_are_rebuilt(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from social_update import update_social
+        values={'social_posts':[dict(source='ptt',id='old',published_at='2026-09-29T11:00:00Z',symbols=['2330'])]}
+        store=SimpleNamespace(snapshot=lambda:{'rows':self.stocks},get=lambda key,default=None:values.get(key,default),put=lambda key,value:values.update({key:value}))
+        new=dict(source='ptt',id='new',published_at='2026-09-29T11:00:00Z',symbols=['2330'])
+        with patch('social_update.collect_ptt',return_value=([new],dict(status='partial',scanned=1))), \
+             patch('social_update.collect_threads',return_value=([],dict(status='not_configured',scanned=0))), \
+             patch('social_update.collect_dcard') as dcard:
+            report=update_social(SimpleNamespace(store=store),self.now,skip_dcard=True)
+        dcard.assert_not_called()
+        self.assertEqual(report['sources']['dcard']['status'],'disabled')
+        self.assertEqual(report['windows']['24h'][0]['total'],1)
+        self.assertEqual(report['windows']['24h'][0]['evidence'][0]['id'],'new')
+        self.assertIn('重新收集',report['coverage_note'])
+
+    def test_current_identifier_keeps_previous_verified_posts(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from social_update import update_social
+        from marketlab.social import IDENTIFIER_VERSION
+        previous=dict(source='ptt',id='verified',published_at='2026-09-29T11:00:00Z',symbols=['2330'])
+        values={'social_observations':dict(posts=[previous],identifier_version=IDENTIFIER_VERSION,rebuild_at='2026-09-28T11:00:00Z')}
+        store=SimpleNamespace(snapshot=lambda:{'rows':self.stocks},get=lambda key,default=None:values.get(key,default),put=lambda key,value:values.update({key:value}))
+        with patch('social_update.collect_ptt',return_value=([],dict(status='partial',scanned=0))), \
+             patch('social_update.collect_threads',return_value=([],dict(status='not_configured',scanned=0))):
+            report=update_social(SimpleNamespace(store=store),self.now,skip_dcard=True)
+        self.assertEqual(report['windows']['24h'][0]['total'],1)
+        self.assertEqual(values['social_observations']['rebuild_at'],'2026-09-28T11:00:00Z')
+
     def test_deduplication_time_windows_and_missing_source(self):
         post=dict(source='ptt',id='a',published_at='2026-09-29T11:00:00+00:00',symbols=['2330','2330'],url='https://www.ptt.cc/bbs/Stock/M.1.html',title='台積電')
         older=dict(post,id='b',published_at='2026-09-27T11:00:00+00:00')

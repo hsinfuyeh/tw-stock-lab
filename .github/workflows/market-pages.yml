@@ -60,7 +60,7 @@ jobs:
         timeout-minutes: 8
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-        run: python social_update.py
+        run: python social_update.py --skip-dcard
       - name: Save resumable data cache
         if: always()
         uses: actions/cache/save@v4
