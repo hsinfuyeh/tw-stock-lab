@@ -64,7 +64,8 @@ def reason(exc):
     return f'HTTP {exc.code}' if isinstance(exc,HTTPError) else type(exc).__name__
 
 
-def collect_ptt(stocks,current,fetch=fetch_public,max_pages=12,max_posts=150):
+def collect_ptt(stocks,current,fetch=fetch_public,max_pages=12,max_posts=150,since=None):
+    since=since or current-timedelta(days=7)
     posts=[];seen=set();url='https://www.ptt.cc/bbs/Stock/index.html';errors=0;pages=0;start=time.monotonic()
     try:
         while url and pages<max_pages and len(seen)<max_posts and time.monotonic()-start<300:
@@ -75,7 +76,7 @@ def collect_ptt(stocks,current,fetch=fetch_public,max_pages=12,max_posts=150):
                 seen.add(link)
                 try:
                     post=parse_ptt_article(fetch(link),link,stocks)
-                    if current-timedelta(days=7)<=timestamp(post['published_at'])<=current: posts.append(post)
+                    if since<=timestamp(post['published_at'])<=current: posts.append(post)
                 except Exception: errors+=1
                 time.sleep(.15)
         status='partial' if posts else 'failed' if errors else 'partial'
@@ -85,7 +86,8 @@ def collect_ptt(stocks,current,fetch=fetch_public,max_pages=12,max_posts=150):
         return posts,dict(status='partial' if posts else 'failed',scanned=len(seen),pages=pages,error=reason(exc),scope='PTT Stock；收集未完成')
 
 
-def collect_dcard(stocks,current,fetch=fetch_public,max_pages=5):
+def collect_dcard(stocks,current,fetch=fetch_public,max_pages=5,since=None):
+    since=since or current-timedelta(days=7)
     posts=[];before=None;scanned=0;pages=0
     try:
         for _ in range(max_pages):
@@ -97,20 +99,27 @@ def collect_dcard(stocks,current,fetch=fetch_public,max_pages=5):
             if not rows: break
             for row in rows:
                 scanned+=1;published=timestamp(row.get('createdAt'))
-                if not published or not current-timedelta(days=7)<=published<=current: continue
+                if not published or not since<=published<=current: continue
                 text=str(row.get('title',''))+' '+str(row.get('excerpt',''))
                 posts.append(dict(source='dcard',id=str(row['id']),url=f'https://www.dcard.tw/f/stock/p/{int(row["id"])}',
                     title=str(row.get('title',''))[:160],published_at=published.isoformat(),symbols=identify(text,stocks)))
             cursor=rows[-1].get('id')
             if cursor==before: break
             before=cursor
-            if timestamp(rows[-1].get('createdAt')) and timestamp(rows[-1]['createdAt'])<current-timedelta(days=7): break
+            if timestamp(rows[-1].get('createdAt')) and timestamp(rows[-1]['createdAt'])<since: break
         return posts,dict(status='partial',scanned=scanned,pages=pages,scope='Dcard 股票板最新貼文標題與摘要；至多 5 頁、每頁 100 篇，不含留言與摘要外內文。')
     except Exception as exc:
         return posts,dict(status='partial' if posts else 'failed',scanned=scanned,pages=pages,error=reason(exc),scope='Dcard 股票板；來源拒絕或尚無可用資料服務，不繞過驗證。')
 
 
-def collect_threads(stocks,current,token=None,fetch=fetch_public,max_pages=3):
+def collect_threads_public(stocks,current,since=None):
+    # Anonymous discovery did not establish a usable search/publication-time source.
+    # Never silently fall back to the user's browser cookies or an account token.
+    return [],dict(status='unavailable',scanned=0,scope='Threads 未登入公開搜尋尚未接通；未使用個人帳號或登入 Cookie，未取得可核對發布時間的文章。')
+
+
+def collect_threads(stocks,current,token=None,fetch=fetch_public,max_pages=3,since=None):
+    since=since or current-timedelta(days=7)
     token=token if token is not None else os.environ.get('THREADS_ACCESS_TOKEN','')
     if not token: return [],dict(status='not_configured',scanned=0,scope='Threads 官方 API 尚未設定授權。')
     posts=[];scanned=0;pages=0
@@ -119,7 +128,7 @@ def collect_threads(stocks,current,token=None,fetch=fetch_public,max_pages=3):
             after=None
             for _ in range(max_pages):
                 params=dict(q=query,search_type='RECENT',limit=50,fields='id,text,timestamp,permalink',
-                    since=int((current-timedelta(days=7)).timestamp()),until=int(current.timestamp()))
+                    since=int(since.timestamp()),until=int(current.timestamp()))
                 if after: params['after']=after
                 data=json.loads(fetch('https://graph.threads.net/v1.0/keyword_search?'+urlencode(params),headers={'Authorization':'Bearer '+token}))
                 if 'error' in data or not isinstance(data.get('data'),list): raise ValueError('invalid Threads response')
@@ -127,7 +136,7 @@ def collect_threads(stocks,current,token=None,fetch=fetch_public,max_pages=3):
                 for row in data['data']:
                     scanned+=1;published=timestamp(row.get('timestamp'))
                     link=row.get('permalink','')
-                    if not published or not current-timedelta(days=7)<=published<=current: continue
+                    if not published or not since<=published<=current: continue
                     if urlparse(link).hostname not in ('www.threads.net','www.threads.com','threads.net','threads.com'): continue
                     text=row.get('text','')
                     posts.append(dict(source='threads',id=str(row['id']),url=link,title=str(text)[:120],published_at=published.isoformat(),symbols=identify(text,stocks)))

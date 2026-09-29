@@ -1,5 +1,5 @@
 const names={ptt:'PTT',dcard:'Dcard',threads:'Threads'};
-const statuses={success:'已取得',partial:'部分取樣',failed:'收集失敗',not_configured:'尚未授權',disabled:'暫緩收集'};
+const statuses={success:'已取得',partial:'部分取樣',failed:'收集失敗',not_configured:'尚未授權',disabled:'暫緩收集',unavailable:'來源未接通',queued:'等待收集',collecting:'收集中'};
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=value=>value?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'尚未收集';
 
@@ -19,9 +19,32 @@ function safeLink(value,source){
   }catch{return '';}
 }
 
-export function createSocialView(root,fetcher){
-  let report=null,error='',loading=false,windowKey='24h',source='all',page=1,generation=0;
+export function createSocialUpdater(api,onJob,onDone,onError,schedule=setTimeout){
+  let busy=false,retries=0;
+  async function accept(job){
+    onJob(job);
+    if(job.running){schedule(poll,1500);return;}
+    busy=false;await onDone();
+  }
+  async function poll(){
+    try{const job=await api.status();retries=0;await accept(job);}
+    catch{if(++retries<=3)schedule(poll,3000);else{busy=false;onJob({running:false,status:'failed'});onError('無法確認收集狀態；本機服務可能已停止。重新連線後可再次讀取進度。');}}
+  }
+  return {async start(window){
+    if(busy)return;busy=true;retries=0;onJob({running:true,status:'starting',sources:{}});
+    try{await accept(await api.start(window));}
+    catch{busy=false;onJob({running:false,status:'failed'});onError('無法啟動收集，請確認本機資料服務仍在執行。');}
+  },async resume(){
+    if(busy)return;
+    try{const job=await api.status();onJob(job);if(job.running){busy=true;schedule(poll,1500);}}
+    catch{onError('無法讀取本機社群收集狀態。');}
+  }};
+}
+
+export function createSocialView(root,fetcher,api=null){
+  let report=null,error='',loading=false,windowKey='24h',source='all',page=1,generation=0,job={running:false,status:'idle'};
   const $=selector=>root.querySelector(selector);
+  const updater=api?createSocialUpdater(api,value=>{job=value;if(job.running&&['24h','7d'].includes(job.window)){windowKey=job.window;$('[data-social-window]').value=windowKey;}render();},async()=>{page=1;await load();},value=>{error=value;render();}):null;
   function render(){
     $('[data-social-status]').innerHTML=Object.entries(names).map(([key,name])=>{
       const s=report?.sources?.[key];
@@ -38,6 +61,15 @@ export function createSocialView(root,fetcher){
     $('[data-social-evidence-panel]').hidden=true;
     const collected=report?.collected_at?new Date(report.collected_at).getTime():0;
     $('[data-social-stale]').hidden=!collected||Date.now()-collected<30*3600000;
+    const button=$('[data-social-update]');
+    button.disabled=!updater||job.running;
+    button.textContent=job.running?'正在收集…':'立即更新社群';
+    $('[data-social-window]').disabled=job.running;
+    const progress=$('[data-social-job]');
+    progress.textContent=!updater?'即時抓取需使用本機版；線上頁面只讀取已發布結果。':
+      job.running?`${job.window==='7d'?'近 7 天':job.window==='24h'?'近 24 小時':'正在啟動'} · ${Object.entries(job.sources||{}).map(([key,s])=>`${names[key]}：${statuses[s.status]||s.status}`).join(' · ')}`:
+      job.finished_at?`${job.status==='failed'?'收集未完成，保留先前結果':'收集完成'} · ${date(job.finished_at)}${job.status==='partial'?' · 部分來源未取得完整資料，請查看各平台狀態':''}${job.status==='failed'?` · ${Object.entries(job.sources||{}).map(([key,s])=>`${names[key]}：${statuses[s.status]||s.status}${s.error?`（${s.error}）`:''}`).join(' · ')}`:''}${job.error?` · ${job.error}`:''}`:
+      '按下後立即向來源收集所選期間；可能需要數分鐘。Dcard 重新嘗試公開 API，Threads 不使用個人帳號。';
   }
   root.addEventListener('change',event=>{
     if(event.target.matches('[data-social-window]')) windowKey=event.target.value;
@@ -47,6 +79,7 @@ export function createSocialView(root,fetcher){
   });
   root.addEventListener('click',event=>{
     const target=event.target.closest('button');if(!target)return;
+    if(target.hasAttribute('data-social-update')&&updater){error='';updater.start(windowKey);}
     if(target.hasAttribute('data-social-prev')){page--;render();}
     if(target.hasAttribute('data-social-next')){page++;render();}
     if(target.hasAttribute('data-social-close')) $('[data-social-evidence-panel]').hidden=true;
@@ -61,10 +94,11 @@ export function createSocialView(root,fetcher){
       panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});
     }
   });
-  return {async load(){
+  async function load(){
     const version=++generation;loading=true;error='';render();
     try{const result=await fetcher();if(version!==generation)return;report=result;}
     catch{if(version!==generation)return;error='社群資料讀取失敗，請稍後重新讀取。';}
     if(version===generation){loading=false;render();}
-  },render};
+  }
+  return {async load(){await load();if(updater)await updater.resume();},render};
 }

@@ -14,6 +14,15 @@ test('social pages exclude unavailable sources, use per-platform ranks, and cap 
   assert.equal(socialPage(report,'24h','ptt',99).rows.length,3);
   assert.equal(socialPage(report,'24h','ptt',99).page,3);
 });
+test('social update starts collection, prevents duplicate clicks, polls then reloads', async () => {
+  const {createSocialUpdater}=await import('../web/social.js');
+  let starts=0,reloads=0,nextPoll; const states=[];
+  const updater=createSocialUpdater({start:async window=>{starts++; assert.equal(window,'24h'); return {id:'j',running:true};},status:async()=>({id:'j',running:false,status:'partial'})},
+    job=>states.push(job),async()=>{reloads++;},error=>assert.fail(error),fn=>{nextPoll=fn;});
+  await updater.start('24h'); await updater.start('24h');
+  assert.equal(starts,1); assert.equal(reloads,0);
+  await nextPoll(); assert.equal(reloads,1); assert.equal(states.at(-1).status,'partial');
+});
 const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekTableMarkup, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
 
 test('individual search matches both 台 and 臺 names and exact code comes first', async () => {

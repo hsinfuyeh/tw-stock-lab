@@ -11,6 +11,19 @@ from marketlab.data import TwseClient
 
 
 class DownloadTests(unittest.TestCase):
+    def test_requested_refresh_bypasses_recent_cache_but_keeps_final_history(self):
+        url="https://www.twse.com.tw/example"
+        with tempfile.TemporaryDirectory() as root,patch("marketlab.data.time.sleep"):
+            with patch("marketlab.data.urlopen",side_effect=lambda *a,**k:io.BytesIO(b'{"date":"20260924"}')):
+                seeded=TwseClient(root)
+                seeded.fetch("recent",url,600)
+                seeded.fetch("historical",url)
+            with patch("marketlab.data.urlopen",side_effect=lambda *a,**k:io.BytesIO(b'{"date":"20260929"}')):
+                refreshed=TwseClient(root)
+                refreshed.refresh_recent=True
+                self.assertEqual(refreshed.fetch("recent",url,600)["date"],"20260929")
+                self.assertEqual(refreshed.fetch("historical",url)["date"],"20260924")
+
     def test_standard_request_avoids_header_dependent_redirect_loop(self):
         url="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?response=json&date=20241001&stockNo=0056"
         payload={"stat":"OK","data":[["113/10/01","100"]]}

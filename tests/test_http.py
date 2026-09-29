@@ -36,6 +36,12 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as ctx:urlopen(req)
         self.assertEqual(ctx.exception.code,400)
         self.assertEqual(self.service.settings()["min_probability"],.6)
+    def test_market_job_poll_does_not_load_full_snapshot(self):
+        from unittest.mock import patch
+        with patch.object(self.service,'state',side_effect=AssertionError('full snapshot loaded')):
+            with urlopen(self.base+'/api/job') as response: payload=json.load(response)
+        self.assertEqual(set(payload),{'job'})
+        self.assertFalse(payload['job']['running'])
     def test_explore_uses_latest_snapshot_and_keeps_stale_security_searchable(self):
         self.service.store.save_snapshot(dict(id='old',as_of='2026-09-14',created_at='old',rows=[]))
         self.service.store.save_snapshot(dict(id='new',as_of='2026-09-15',created_at='new',
@@ -50,6 +56,27 @@ class HttpTests(unittest.TestCase):
         req=Request(self.base+"/api/settings",b"{}",{"Content-Type":"application/json","Origin":"https://example.com"})
         with self.assertRaises(HTTPError) as ctx:urlopen(req)
         self.assertEqual(ctx.exception.code,403)
+
+    def test_social_update_uses_real_background_endpoint_and_validates_scope(self):
+        from unittest.mock import patch
+        payload={'sources':{'ptt':{'status':'partial'},'dcard':{'status':'failed'},'threads':{'status':'unavailable'}}}
+        with patch('social_update.update_social',return_value=payload):
+            # New server captures the injected collector before starting its job.
+            server=make_server(self.service,0)
+            worker=threading.Thread(target=server.serve_forever,daemon=True);worker.start()
+            url=f'http://127.0.0.1:{server.server_port}'
+            try:
+                request=Request(url+'/api/social/update',b'{"window":"24h"}',{'Content-Type':'application/json'})
+                with urlopen(request) as response:
+                    self.assertEqual(response.status,202); self.assertEqual(json.load(response)['job']['window'],'24h')
+                with urlopen(url+'/api/social/job') as response:self.assertIn('sources',json.load(response)['job'])
+                request=Request(url+'/api/social/update',b'{"window":"all"}',{'Content-Type':'application/json'})
+                with self.assertRaises(HTTPError) as error:urlopen(request)
+                self.assertEqual(error.exception.code,400)
+                request=Request(url+'/api/social/update',b'{"window":"24h"}',{'Content-Type':'application/json','Origin':'https://example.com'})
+                with self.assertRaises(HTTPError) as error:urlopen(request)
+                self.assertEqual(error.exception.code,403)
+            finally:server.shutdown();server.server_close();worker.join()
     def test_csv_uses_requested_snapshot_and_sorts_return_not_name(self):
         def snap(sid,values):
             return dict(id=sid,as_of="2026-09-15",created_at=sid,rows=[dict(symbol=s,name=s,kind="stock",horizons={"7":dict(expected_return=v,p_positive=.6,p_recovery=.8,q10=-2,q90=3,n=60,eligible=True,reasons=[],target_date="2026-09-22")}) for s,v in values])

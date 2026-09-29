@@ -136,9 +136,12 @@ class ResearchService:
         self._status(running=True,phase="資料檢查",progress=0,total=1,message="取得 TWSE 清單與大盤交易日",error=None,
                      started_at=now().isoformat(),finished_at=None)
         try:
+            previous=self.store.snapshot()
             snapshot=self._run()
+            unchanged=previous and previous['id']==snapshot['id']
             self._status(running=False,phase="完成",progress=self.job.get("total",1),
-                         message=f"研究完成，資料截至 {snapshot['as_of']}",finished_at=now().isoformat())
+                         message=(f"資料檢查完成，資料日未變更：{snapshot['as_of']}" if unchanged
+                                  else f"研究完成，資料截至 {snapshot['as_of']}"),finished_at=now().isoformat())
             return snapshot
         except Exception as exc:
             self._status(running=False,phase="更新失敗",error=str(exc),message="保留上一份完整快照",finished_at=now().isoformat())
@@ -355,6 +358,7 @@ class MarketService(ResearchService):
 
     def state(self):
         state=super().state()
+        state['checked_at']=self.store.get('checked_at')
         visible={meta['id'] for meta in self.store.history(limit=3)}
         state['two_week_outcomes']=[row for row in self.store.get('two_week_outcomes',[])
                                     if row['snapshot_id'] in visible]
@@ -407,6 +411,7 @@ class MarketService(ResearchService):
         from concurrent.futures import ProcessPoolExecutor
         settings=self.settings()
         client=self.client_factory(self.root,lambda symbol,session:self._status(phase='下載全市場',message=f'{symbol} {session}'))
+        client.refresh_recent=True
         universe=client.universe()
         calendar=client.calendar(month_list(settings['months']))
         if not calendar['actual']: raise ValueError('官方尚無可使用的完整盤後資料')

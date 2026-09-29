@@ -360,6 +360,8 @@ function renderSnapshotHeader() {
   }
   const latest = appState.history[0];
   $('#snapshotStatus').textContent = `${latest?.id && latest.id !== snapshot.id ? '歷史報告' : '最新報告'}產製於 ${formatDate(snapshot.created_at, true)}`;
+  $('#sourceChecked').hidden=!appState.checkedAt;
+  $('#sourceChecked').textContent=appState.checkedAt?`來源檢查：${formatDate(appState.checkedAt,true)}`:'';
   $('#asOf').textContent = formatDate(snapshot.as_of);
   $('#universeCount').textContent = snapshot.coverage ? `${snapshot.coverage.universe_count} 檔標的` : `${snapshot.rows?.length || 0} 檔清單`;
   const coverage = snapshot.coverage;
@@ -513,7 +515,7 @@ function setUpdateButtons(running) {
   for (const button of [$('#updateButton'), $('#emptyUpdateButton')]) {
     if (!button) continue;
     button.disabled = running;
-    if (button.id === 'updateButton') button.querySelector('.button-label').textContent = STATIC_MODE ? '重新讀取' : running ? '更新中' : '執行資料更新';
+    if (button.id === 'updateButton') button.querySelector('.button-label').textContent = STATIC_MODE ? '讀取雲端報告' : running ? '更新行情中' : '更新行情資料';
   }
 }
 
@@ -533,7 +535,16 @@ function schedulePoll() {
   clearTimeout(appState.pollTimer);
   if (!appState.job?.running) return;
   appState.pollTimer = setTimeout(async () => {
-    await loadState({ quiet: true });
+    try {
+      const payload = await fetchJSON('/api/job');
+      appState.job = payload.job;
+      renderJob();
+      if (appState.job?.running) schedulePoll();
+      else await loadState({ quiet: true });
+    } catch (error) {
+      showError(error.message);
+      schedulePoll();
+    }
   }, 1400);
 }
 
@@ -749,11 +760,15 @@ function renderView() {
   renderExplorer();
   if (appState.view !== 'today') ensureCatalog();
   if (appState.view === 'social') loadSocialView();
+  if (appState.view === 'social'&&!appState.job?.running) $('#jobPanel').hidden=true;
 }
 
 let socialViewPromise;
 async function loadSocialView() {
-  if (!socialViewPromise) socialViewPromise = import('./social.js').then(({createSocialView}) => createSocialView($('#socialView'), () => fetchJSON(dataURL(STATIC_MODE,'social'))));
+  if (!socialViewPromise) socialViewPromise = import('./social.js').then(({createSocialView}) => createSocialView($('#socialView'), () => fetchJSON(dataURL(STATIC_MODE,'social')), STATIC_MODE?null:{
+    start:async window=>(await fetchJSON('/api/social/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({window})})).job,
+    status:async()=>(await fetchJSON('/api/social/job')).job
+  }));
   try { await (await socialViewPromise).load(); }
   catch { $('#socialView [data-social-summary]').textContent='社群功能載入失敗，請重新整理。'; socialViewPromise=null; }
 }
@@ -947,12 +962,13 @@ function init() {
   if (STATIC_MODE) {
     document.body.classList.add('static-mode');
     $('#settingsButton').hidden = true;
-    $('#updateButton .button-label').textContent = '重新讀取';
+    $('#updateButton .button-label').textContent = '讀取雲端報告';
     $('#updateButton').title = '讀取雲端已發布結果；不會啟動證交所資料抓取';
     $('#emptyUpdateButton').textContent = '讀取最新報告';
     $('#exportLink').hidden = true;
   } else {
-    $('#updateButton .button-label').textContent = '執行資料更新';
+    $('#updateButton .button-label').textContent = '更新行情資料';
+    $('#updateButton').title = '立即向官方來源確認並取得行情資料，完成後更新研究結果';
   }
   bindEvents();
   loadState();

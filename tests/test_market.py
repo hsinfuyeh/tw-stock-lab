@@ -11,6 +11,43 @@ from test_analytics import bars, cal
 
 
 class MarketTests(unittest.TestCase):
+    def test_unchanged_official_data_records_check_without_rewriting_report_time(self):
+        from datetime import datetime
+        from marketlab.service import MarketService
+        fixture=bars(70)
+        class Client:
+            def __init__(self,*args): self.evidence=[]
+            def universe(self): return [dict(symbol='2330',name='test',kind='stock')]
+            def calendar(self,*args): return cal(fixture)
+            def market_bundles(self,*args): return {'2330':dict(rows=fixture,issues=[])}
+        with tempfile.TemporaryDirectory() as root:
+            instance=MarketService(root,client_factory=Client,workers=1)
+            with patch('marketlab.service.now',return_value=datetime.fromisoformat('2026-09-28T20:00:00+08:00')):
+                original=instance.update()
+            with patch('marketlab.service.now',return_value=datetime.fromisoformat('2026-09-29T23:00:00+08:00')):
+                unchanged=instance.update()
+            self.assertEqual(unchanged['id'],original['id'])
+            self.assertEqual(unchanged['created_at'],'2026-09-28T20:00:00+08:00')
+            self.assertEqual(instance.state().get('checked_at'),'2026-09-29T23:00:00+08:00')
+            self.assertIn('未變更',instance.state()['job']['message'])
+
+    def test_market_update_queries_original_source_even_when_recent_cache_is_valid(self):
+        from marketlab.service import MarketService
+        fixture=bars(70)
+        url='https://www.twse.com.tw/test-universe'
+        class Client(data.MarketClient):
+            def universe(self): return self.fetch('test-universe',url,3600)
+            def calendar(self,*args): return cal(fixture)
+            def market_bundles(self,universe,*args):
+                return {info['symbol']:dict(rows=fixture,issues=[]) for info in universe}
+        with tempfile.TemporaryDirectory() as root,patch('marketlab.data.time.sleep'):
+            with patch('marketlab.data.urlopen',side_effect=lambda *a,**k:io.BytesIO(b'[{"symbol":"2330","name":"old","kind":"stock"}]')):
+                data.TwseClient(root).fetch('test-universe',url,3600)
+            with patch('marketlab.data.urlopen',side_effect=lambda *a,**k:io.BytesIO(b'[{"symbol":"2317","name":"fresh","kind":"stock"}]')):
+                instance=MarketService(root,client_factory=Client,workers=1)
+                snapshot=instance.update()
+            self.assertEqual(snapshot['rows'][0]['symbol'],'2317')
+
     def test_invalid_cached_daily_response_is_replaced_with_valid_payload(self):
         import inspect
         self.assertIn('validate',inspect.signature(data.TwseClient.fetch).parameters)

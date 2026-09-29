@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from marketlab.service import ResearchService
+from marketlab.service import MarketService
 from marketlab.server import make_server
 
 def main():
@@ -14,7 +14,7 @@ def main():
     parser.add_argument("--horizon",type=int,default=7)
     parser.add_argument("--output")
     args=parser.parse_args()
-    service=ResearchService(args.data_dir)
+    service=MarketService(args.data_dir)
     if args.command=="serve":
         server=make_server(service,args.port)
         print(f"臺股研究台 http://127.0.0.1:{args.port}",flush=True)

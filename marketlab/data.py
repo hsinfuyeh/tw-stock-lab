@@ -93,8 +93,12 @@ class TwseClient:
         self.last_request=0
         self.progress=progress or (lambda *args:None)
         self.evidence=[]
+        self.refresh_recent=False
 
     def fetch(self,key,url,max_age=None,month=None,validate=None):
+        # Explicit updates must consult the source for mutable feeds. Historical
+        # content without a TTL remains reusable, so full-market refresh is bounded.
+        if self.refresh_recent and max_age is not None: max_age=0
         from urllib.parse import urlparse,parse_qs
         alternate=url.replace('/exchangeReport/STOCK_DAY?','/rwd/zh/afterTrading/STOCK_DAY?')
         if '/exchangeReport/MI_INDEX?' in url:
