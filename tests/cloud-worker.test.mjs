@@ -51,3 +51,28 @@ test('job lookup refuses other workflows and request bodies cannot choose a repo
   assert.equal((await worker.fetch(request({scope:'social',window:'24h',repository:'evil/repo'}),env)).status,400);
   assert.equal((await worker.fetch(new Request('https://update.example.com/job?id=2',{headers:{Origin:env.SITE_ORIGIN}}),env)).status,404);
 });
+test('preflight timeout does not dispatch or claim that the update failed',async()=>{
+  let calls=0;const worker=createWorker(async()=>{calls++;throw new DOMException('timed out','TimeoutError');});
+  const response=await worker.fetch(request({scope:'market',window:'7d'}),env);
+  assert.equal(response.status,503);
+  assert.match((await response.json()).error,/尚未送出/);
+  assert.equal(calls,1);
+});
+test('preflight only requests a small recent-run page',async()=>{
+  let listing='';const worker=createWorker(async url=>{
+    if(url.includes('/dispatches'))return Response.json({workflow_run_id:55});
+    listing=url;return Response.json({workflow_runs:[]});
+  });
+  await worker.fetch(request({scope:'market',window:'7d'}),env);
+  assert.match(listing,/per_page=10/);
+});
+test('dispatch timeout reports uncertain state without sending a second request',async()=>{
+  let dispatches=0;const worker=createWorker(async url=>{
+    if(url.includes('/dispatches')){dispatches++;throw new DOMException('timed out','TimeoutError');}
+    return Response.json({workflow_runs:[]});
+  });
+  const response=await worker.fetch(request({scope:'social',window:'24h'}),env);
+  assert.equal(response.status,504);
+  assert.match((await response.json()).error,/無法確認是否已排入/);
+  assert.equal(dispatches,1);
+});

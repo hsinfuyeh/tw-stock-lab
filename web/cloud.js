@@ -14,7 +14,7 @@ export function createCloudClient(endpoint,getKey,fetcher,storage){
       if(!key)throw Error('已取消雲端更新');
       let payload;
       try{payload=await fetcher(`${base}/update`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({scope,window})});}
-      catch(error){key='';throw error;}
+      catch(error){if(error.status===401)key='';throw error;}
       reference={id:payload.job.id,scope,window};
       try{storage?.setItem(storageKey,JSON.stringify(reference));}catch{}
       return {...payload.job,scope,window};

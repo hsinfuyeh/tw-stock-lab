@@ -23,6 +23,19 @@ test('social update starts collection, prevents duplicate clicks, polls then rel
   assert.equal(starts,1); assert.equal(reloads,0);
   await nextPoll(); assert.equal(reloads,1); assert.equal(states.at(-1).status,'partial');
 });
+test('temporary social polling errors do not mark the remote job failed',async()=>{
+  const {createSocialUpdater}=await import('../web/social.js');
+  let polls=0,nextPoll,reloads=0;const states=[],errors=[];
+  const updater=createSocialUpdater({pollDelay:1,start:async()=>({id:'42',running:true,status:'queued'}),status:async()=>{
+    polls++;if(polls<=4)throw Error('temporary outage');
+    return {id:'42',running:false,status:'success'};
+  }},job=>states.push(job),async()=>{reloads++;},message=>errors.push(message),fn=>{nextPoll=fn;});
+  await updater.start('24h');
+  for(let i=0;i<5;i++)await nextPoll();
+  assert.equal(reloads,1);
+  assert.ok(states.slice(0,-1).every(job=>job.running));
+  assert.equal(states.at(-1).status,'success');
+});
 const { filterRows, signalDatesWithLabels, sortRows, verificationLabel, paginateRows, dataAgeWarning, dataURL, createDetailLoader, updateRanking, formatDate, twoWeekRows, twoWeekTableMarkup, twoWeekSummary, twoWeekOutcomesForSnapshot } = await import(moduleUrl);
 
 test('individual search matches both 台 and 臺 names and exact code comes first', async () => {
@@ -80,6 +93,12 @@ test('unvalidated ranking omits unavailable probability and labels every mobile 
   assert.match(markup, /成交量擴大/);
   assert.match(markup, /<details[^>]*>.*突破前20日高點/s);
   assert.match(markup, /121\.35/);
+});
+test('candidate rows include an accessible collapsed mobile disclosure',()=>{
+  const html=twoWeekTableMarkup({status:'insufficient_validation',research_candidates:[{symbol:'2305',name:'全友',kind:'stock',close:68.7}]});
+  assert.match(html,/data-mobile-row-toggle/);
+  assert.match(html,/aria-expanded="false"/);
+  assert.match(html,/展開 2305 全友/);
 });
 
 test('validated ranking identifies group rate as an estimate', () => {

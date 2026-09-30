@@ -81,7 +81,7 @@ export function twoWeekTableMarkup(report) {
     const metricClass = (value) => finiteNumber(value) === null ? '' : value >= 0 ? ' positive' : ' negative';
     return `<tr>
       <td class="rank" data-label="排序">${index + 1}</td>
-      <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${escapeHtml(kindLabel(row.kind))}</small></div></td>
+      <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${escapeHtml(kindLabel(row.kind))}</small></div><button class="mobile-row-toggle" type="button" data-mobile-row-toggle aria-expanded="false" aria-label="展開 ${escapeHtml(row.symbol)} ${escapeHtml(row.name || '未提供名稱')} 的完整資訊">展開</button></td>
       <td class="close-cell" data-label="盤後收盤價">${formatDecimal(row.close, 2)}</td>
       <td class="metric-cell${metricClass(row.momentum5_pct)}" data-label="近 5 日">${metric(row.momentum5_pct)}</td>
       <td class="metric-cell${metricClass(row.momentum20_pct)}" data-label="近 20 日">${metric(row.momentum20_pct)}</td>
@@ -292,7 +292,7 @@ async function fetchJSON(url, options = {}) {
   try { payload = await response.json(); } catch { /* handled below */ }
   if (!response.ok) {
     const message = payload?.error || payload?.message || `HTTP ${response.status}`;
-    throw new Error(message);
+    throw Object.assign(new Error(message),{status:response.status});
   }
   if (payload === null) throw new Error('伺服器未回傳可讀取的 JSON');
   return payload;
@@ -803,7 +803,7 @@ function exploreTable(rows, start, rankConfig = null) {
   };
   return `<div class="table-shell"><table class="explore-table"><thead><tr><th scope="col">排序</th><th scope="col">標的</th><th scope="col">盤後收盤價</th><th scope="col">${primary}</th><th scope="col">近 20 交易日走勢</th><th scope="col">個股資訊</th></tr></thead><tbody>${rows.map((row,i) => `<tr>
     <td class="rank" data-label="排序">${start+i+1}</td>
-    <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${kindLabel(row.kind)}</small></div>${row.data_as_of !== appState.snapshot?.as_of ? `<small class="stale-security">行情日 ${escapeHtml(row.data_as_of || '無資料')} · 當日無有效行情</small>` : ''}</td>
+    <td class="security-cell" data-label="標的"><div class="primary-security"><b>${escapeHtml(row.symbol)}</b><span>${escapeHtml(row.name || '未提供名稱')}</span><small class="asset-badge">${kindLabel(row.kind)}</small></div><button class="mobile-row-toggle" type="button" data-mobile-row-toggle aria-expanded="false" aria-label="展開 ${escapeHtml(row.symbol)} ${escapeHtml(row.name || '未提供名稱')} 的完整資訊">展開</button>${row.data_as_of !== appState.snapshot?.as_of ? `<small class="stale-security">行情日 ${escapeHtml(row.data_as_of || '無資料')} · 當日無有效行情</small>` : ''}</td>
     <td class="close-cell" data-label="盤後收盤價">${formatDecimal(row.metrics?.close,2)}</td>
     <td class="metric-cell${!rankConfig || rankConfig.unit === 'percent' && rankConfig.metric !== 'volatility_pct' ? ` ${toneClass(row.metrics?.[rankConfig?.metric || 'change_pct'])}` : ''}" data-label="${primary}">${valueText(row)}</td>
     <td class="trend-cell" data-label="近 20 交易日走勢">${trendMarkup(row.trend)}</td>
@@ -909,6 +909,14 @@ function bindEvents() {
     });
   }
   document.addEventListener('click', event => {
+    const toggle = event.target.closest('[data-mobile-row-toggle]');
+    if(toggle){
+      const expanded=toggle.closest('tr').classList.toggle('is-expanded');
+      toggle.setAttribute('aria-expanded',String(expanded));
+      toggle.textContent=expanded?'收合':'展開';
+      toggle.setAttribute('aria-label',`${expanded?'收合':'展開'} ${toggle.closest('tr').querySelector('.security-cell b')?.textContent||'標的'} 的完整資訊`);
+      return;
+    }
     const button = event.target.closest('[data-detail-symbol]');
     if (button) openDetail(button.dataset.detailSymbol);
   });

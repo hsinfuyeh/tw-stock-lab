@@ -23,3 +23,16 @@ test('cloud endpoint requires HTTPS on workers.dev; cancelled login sends no upd
   const client=createCloudClient('https://update.demo.workers.dev',async()=>null,async()=>{calls++;},store);
   await assert.rejects(client.start('market','7d'),/取消/);assert.equal(calls,0);
 });
+test('temporary update error keeps in-memory password while unauthorized clears it',async()=>{
+  let prompts=0,calls=0;
+  const client=createCloudClient('https://update.demo.workers.dev',async()=>{prompts++;return 'password';},async()=>{
+    calls++;
+    if(calls===1)throw Object.assign(Error('timeout'),{status:503});
+    if(calls===2)throw Object.assign(Error('bad key'),{status:401});
+    return {job:{id:'42'}};
+  });
+  await assert.rejects(client.start('market','7d'),/timeout/);
+  await assert.rejects(client.start('market','7d'),/bad key/);
+  await client.start('market','7d');
+  assert.equal(prompts,2);
+});

@@ -41,14 +41,24 @@ export function createWorker(fetcher=fetch){
         let body;try{body=JSON.parse(text);}catch{return send(400,{error:'JSON 格式錯誤'});}
         if(!body||Array.isArray(body)||typeof body!=='object'||Object.keys(body).sort().join(',')!=='scope,window'||!['market','social','all'].includes(body.scope)||!['24h','7d'].includes(body.window))return send(400,{error:'更新類型或統計期間錯誤'});
         // Production dispatches are serialized by UpdateCoordinator below.
-        const runs=await github(`/workflows/${workflow}/runs?branch=main&per_page=30`);
+        let runs;
+        try{runs=await github(`/workflows/${workflow}/runs?branch=main&per_page=10`);}
+        catch(error){
+          if(error.name==='TimeoutError')return send(503,{error:'GitHub 工作狀態查詢逾時，更新尚未送出；請稍後再試。'});
+          throw error;
+        }
         const active=runs.workflow_runs.find(r=>activeStatuses.has(r.status));
         if(active){
           if(active.event!=='workflow_dispatch'||active.display_title!==`${body.scope} · ${body.window}`)
             return send(409,{error:'已有其他更新工作執行中，請等完成後重試本次更新。'});
           return send(202,{job:{...jobFor(active,body.scope,body.window),reused:true,message:'同一個雲端更新工作仍在執行'}});
         }
-        const result=await github(`/workflows/${workflow}/dispatches`,{method:'POST',body:JSON.stringify({ref:'main',inputs:body})});
+        let result;
+        try{result=await github(`/workflows/${workflow}/dispatches`,{method:'POST',body:JSON.stringify({ref:'main',inputs:body})});}
+        catch(error){
+          if(error.name==='TimeoutError')return send(504,{error:'GitHub 啟動要求逾時，無法確認是否已排入工作；請先查看 GitHub Actions，再決定是否重試。'});
+          throw error;
+        }
         if(!result?.workflow_run_id)throw Error('已送出更新要求，但未取得工作編號，請到 GitHub Actions 確認');
         return send(202,{job:{id:String(result.workflow_run_id),running:true,status:'queued',scope:body.scope,window:body.window,sources:{},message:'已排入雲端更新佇列'}});
       }
