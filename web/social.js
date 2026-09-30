@@ -48,7 +48,11 @@ export function createSocialView(root,fetcher,api=null){
   function render(){
     $('[data-social-status]').innerHTML=Object.entries(names).map(([key,name])=>{
       const s=report?.sources?.[key];
-      return `<div class="social-source"><strong>${name}</strong><span>${escape(statuses[s?.status]||'尚未收集')}${s?.error?` · ${escape(s.error)}`:''}</span><p>${escape(s?.scope||'尚無來源記錄')}</p><small>檢查：${escape(date(s?.checked_at))} · 掃描 ${s?.scanned??'—'} 篇</small></div>`;
+      const status=`${escape(statuses[s?.status]||'尚未收集')}${s?.error?` · ${escape(s.error)}`:''}`;
+      const scope=escape(s?.scope||'尚無來源記錄');
+      const checked=`檢查：${escape(date(s?.checked_at))} · 掃描 ${s?.scanned??'—'} 篇`;
+      return `<div class="social-source social-source-desktop"><strong>${name}</strong><span>${status}</span><p>${scope}</p><small>${checked}</small></div>
+        <details class="social-source social-source-mobile"><summary><strong>${name}</strong><span>${status}</span></summary><div class="social-source-details"><p>${scope}</p><small>${checked}</small></div></details>`;
     }).join('');
     const data=socialPage(report,windowKey,source,page);page=data.page;
     const available=source==='all'?Object.values(report?.sources||{}).some(s=>['success','partial'].includes(s.status)):['success','partial'].includes(report?.sources?.[source]?.status);
