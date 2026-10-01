@@ -7,7 +7,15 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
-from marketlab.data import TwseClient
+from marketlab.data import TwseClient, month_list
+
+
+class MonthSelectionTests(unittest.TestCase):
+    def test_new_month_is_not_requested_before_the_first_completed_close(self):
+        with patch('marketlab.data.now',return_value=datetime.fromisoformat('2026-10-01T00:05:00+08:00')):
+            self.assertEqual(month_list(2),['20260901','20260801'])
+        with patch('marketlab.data.now',return_value=datetime.fromisoformat('2026-10-01T19:15:00+08:00')):
+            self.assertEqual(month_list(2),['20261001','20260901'])
 
 
 class DownloadTests(unittest.TestCase):

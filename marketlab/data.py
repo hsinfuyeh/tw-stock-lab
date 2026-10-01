@@ -233,8 +233,11 @@ class TwseClient:
 
 
 def month_list(count):
-    today=now().date()
-    value=today.year*12+today.month-1
+    current=now()
+    # Before the evening close, the latest complete session belongs to an
+    # earlier date. On a month's first day its monthly feed may not exist yet.
+    cutoff=current.date() if current.hour>=19 else current.date()-timedelta(days=1)
+    value=cutoff.year*12+cutoff.month-1
     return [f"{(value-offset)//12:04d}{(value-offset)%12+1:02d}01" for offset in range(count)]
 
 
