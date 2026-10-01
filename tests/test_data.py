@@ -17,6 +17,24 @@ class MonthSelectionTests(unittest.TestCase):
         with patch('marketlab.data.now',return_value=datetime.fromisoformat('2026-10-01T19:15:00+08:00')):
             self.assertEqual(month_list(2),['20261001','20260901'])
 
+    def test_first_day_holiday_uses_last_trading_month_when_current_month_has_no_data(self):
+        with tempfile.TemporaryDirectory() as root,patch('marketlab.data.now',return_value=datetime.fromisoformat('2026-10-01T20:00:00+08:00')):
+            client=TwseClient(root)
+            def source(key,*args,**kwargs):
+                if key=='market-20261001': return {'stat':'查無資料'}
+                if key=='market-20260901': return {'stat':'OK','data':[['115/09/30','1','2','3','20000']]}
+                return {'stat':'not available','data':[]}
+            client.fetch=source
+            self.assertEqual(client.calendar(['20261001','20260901'])['actual'],['2026-09-30'])
+
+    def test_current_month_unexpected_error_and_old_month_no_data_still_fail(self):
+        with tempfile.TemporaryDirectory() as root,patch('marketlab.data.now',return_value=datetime.fromisoformat('2026-10-01T20:00:00+08:00')):
+            client=TwseClient(root)
+            client.fetch=lambda key,*args,**kwargs:{'stat':'系統異常'}
+            with self.assertRaises(ValueError): client.calendar(['20261001'])
+            client.fetch=lambda key,*args,**kwargs:{'stat':'查無資料'}
+            with self.assertRaises(ValueError): client.calendar(['20260901'])
+
 
 class DownloadTests(unittest.TestCase):
     def test_requested_refresh_bypasses_recent_cache_but_keeps_final_history(self):

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createWorker} from '../cloud/worker.mjs';
+import {createWorker,UpdateCoordinator} from '../cloud/worker.mjs';
 
 const env={SITE_ORIGIN:'https://hsinfuyeh.github.io',GITHUB_REPOSITORY:'hsinfuyeh/tw-stock-lab',GITHUB_TOKEN:'private-github-token',UPDATE_KEY:'a-long-private-update-password'};
 const request=(body,key=env.UPDATE_KEY,origin=env.SITE_ORIGIN)=>new Request('https://update.example.com/update',{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -75,4 +75,61 @@ test('dispatch timeout reports uncertain state without sending a second request'
   assert.equal(response.status,504);
   assert.match((await response.json()).error,/無法確認是否已排入/);
   assert.equal(dispatches,1);
+});
+
+test('coordinator reuses a dispatched run while GitHub run listing still lags',async()=>{
+  const records=new Map();
+  const ctx={storage:{get:async key=>records.get(key),put:async(key,value)=>{records.set(key,value);},delete:async key=>records.delete(key)},blockConcurrencyWhile:fn=>fn()};
+  let dispatches=0;
+  const fetcher=async url=>{
+    if(url.includes('/dispatches'))return Response.json({workflow_run_id:++dispatches});
+    if(url.includes('/runs/1'))return Response.json({id:1,head_branch:'main',event:'workflow_dispatch',status:'queued',path:'.github/workflows/market-pages.yml',display_title:'social · 24h',created_at:'2026-10-01T00:00:00Z'});
+    return Response.json({workflow_runs:[]});
+  };
+  const original=globalThis.fetch;globalThis.fetch=fetcher;
+  try{
+    const first=new UpdateCoordinator(ctx,env);
+    assert.equal((await(await first.fetch(request({scope:'social',window:'24h'}))).json()).job.id,'1');
+    const restarted=new UpdateCoordinator(ctx,env);
+    const repeat=await restarted.fetch(request({scope:'social',window:'24h'}));
+    assert.equal(repeat.status,202);
+    assert.equal((await repeat.json()).job.id,'1');
+    assert.equal(dispatches,1);
+  }finally{globalThis.fetch=original;}
+});
+
+test('coordinator holds an uncertain dispatch instead of retrying it',async()=>{
+  const records=new Map();
+  const ctx={storage:{get:async key=>records.get(key),put:async(key,value)=>{records.set(key,value);},delete:async key=>records.delete(key)},blockConcurrencyWhile:fn=>fn()};
+  let dispatches=0;
+  const fetcher=async url=>{
+    if(url.includes('/dispatches')){dispatches++;throw new DOMException('timed out','TimeoutError');}
+    return Response.json({workflow_runs:[]});
+  };
+  const original=globalThis.fetch;globalThis.fetch=fetcher;
+  try{
+    const coordinator=new UpdateCoordinator(ctx,env);
+    assert.equal((await coordinator.fetch(request({scope:'social',window:'24h'}))).status,504);
+    const repeat=await coordinator.fetch(request({scope:'social',window:'24h'}));
+    assert.equal(repeat.status,409);
+    assert.equal(dispatches,1);
+  }finally{globalThis.fetch=original;}
+});
+
+test('coordinator releases its reservation after the confirmed run finishes',async()=>{
+  const records=new Map();
+  const ctx={storage:{get:async key=>records.get(key),put:async(key,value)=>{records.set(key,value);},delete:async key=>records.delete(key)},blockConcurrencyWhile:fn=>fn()};
+  let dispatches=0;
+  const fetcher=async url=>{
+    if(url.includes('/dispatches'))return Response.json({workflow_run_id:++dispatches});
+    if(url.includes('/runs/1'))return Response.json({id:1,status:'completed',conclusion:'success'});
+    return Response.json({workflow_runs:[]});
+  };
+  const original=globalThis.fetch;globalThis.fetch=fetcher;
+  try{
+    const coordinator=new UpdateCoordinator(ctx,env);
+    assert.equal((await(await coordinator.fetch(request({scope:'market',window:'7d'}))).json()).job.id,'1');
+    assert.equal((await(await coordinator.fetch(request({scope:'social',window:'24h'}))).json()).job.id,'2');
+    assert.equal(dispatches,2);
+  }finally{globalThis.fetch=original;}
 });

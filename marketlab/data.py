@@ -197,7 +197,11 @@ class TwseClient:
         for month in months:
             age=600 if month>=month_list(2)[-1] else None
             payload=self.fetch("market-"+month,"https://www.twse.com.tw/exchangeReport/FMTQIK?response=json&date="+month,age,month=month)
-            if str(payload.get("stat","")).lower()!="ok": raise ValueError("大盤交易日取得失敗："+month)
+            if str(payload.get("stat","")).lower()!="ok":
+                no_data=any(word in str(payload.get("stat","")) for word in ("沒有符合", "查無資料"))
+                if month==now().strftime("%Y%m01") and no_data and not payload.get("data"):
+                    continue
+                raise ValueError("大盤交易日取得失敗："+month)
             for row in payload.get("data",[]):
                 dt=iso_date(row[0]); dates.append(dt)
                 index.append(dict(date=dt,close=number(row[4])))

@@ -17,7 +17,7 @@ async function sameKey(supplied,expected){
   for(let i=0;i<aa.length;i++)difference|=aa[i]^bb[i];
   return difference===0;
 }
-export function createWorker(fetcher=fetch){
+export function createWorker(fetcher=fetch,state=null){
   return {async fetch(request,env){
     const origin=request.headers.get('Origin');
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'};
@@ -51,7 +51,26 @@ export function createWorker(fetcher=fetch){
         if(active){
           if(active.event!=='workflow_dispatch'||active.display_title!==`${body.scope} · ${body.window}`)
             return send(409,{error:'已有其他更新工作執行中，請等完成後重試本次更新。'});
+          if(state)await state.put('pending',{id:String(active.id),scope:body.scope,window:body.window,createdAt:Date.now()});
           return send(202,{job:{...jobFor(active,body.scope,body.window),reused:true,message:'同一個雲端更新工作仍在執行'}});
+        }
+        if(state){
+          const pending=await state.get('pending');
+          if(pending&&Date.now()-pending.createdAt<15*60*1000){
+            if(!pending.id)return send(409,{error:'前一次 GitHub 啟動要求的結果仍未確認；請先查看 GitHub Actions，稍後再試。'});
+            let run;
+            try{run=await github(`/runs/${pending.id}`);}
+            catch(error){
+              if(error.message!=='GitHub 更新服務回應 404')throw error;
+              return send(202,{job:{id:pending.id,running:true,status:'queued',scope:pending.scope,window:pending.window,sources:{},reused:true,message:'已送出的工作仍在等待 GitHub 顯示'}});
+            }
+            if(activeStatuses.has(run.status)){
+              if(pending.scope!==body.scope||pending.window!==body.window)return send(409,{error:'已有其他更新工作執行中，請等完成後重試本次更新。'});
+              return send(202,{job:{...jobFor(run,pending.scope,pending.window),reused:true,message:'同一個雲端更新工作仍在執行'}});
+            }
+          }
+          if(pending)await state.delete('pending');
+          await state.put('pending',{scope:body.scope,window:body.window,createdAt:Date.now()});
         }
         let result;
         try{result=await github(`/workflows/${workflow}/dispatches`,{method:'POST',body:JSON.stringify({ref:'main',inputs:body})});}
@@ -60,6 +79,7 @@ export function createWorker(fetcher=fetch){
           throw error;
         }
         if(!result?.workflow_run_id)throw Error('已送出更新要求，但未取得工作編號，請到 GitHub Actions 確認');
+        if(state)await state.put('pending',{id:String(result.workflow_run_id),scope:body.scope,window:body.window,createdAt:Date.now()});
         return send(202,{job:{id:String(result.workflow_run_id),running:true,status:'queued',scope:body.scope,window:body.window,sources:{},message:'已排入雲端更新佇列'}});
       }
       if(url.pathname==='/job'&&request.method==='GET'){
@@ -82,7 +102,7 @@ export function createWorker(fetcher=fetch){
 // A single Durable Object serializes dispatches across browser tabs and instances.
 export class UpdateCoordinator{
   constructor(ctx,env){this.ctx=ctx;this.env=env;}
-  async fetch(request){return this.ctx.blockConcurrencyWhile(()=>createWorker().fetch(request,this.env));}
+  async fetch(request){return this.ctx.blockConcurrencyWhile(()=>createWorker(fetch,this.ctx.storage).fetch(request,this.env));}
 }
 export default {async fetch(request,env){
   if(new URL(request.url).pathname==='/update'&&request.method==='POST'){

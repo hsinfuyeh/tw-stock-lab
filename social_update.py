@@ -10,7 +10,9 @@ from marketlab.data import atomic_json
 def update_social(service, current=None, skip_dcard=False,window='7d',local_public=False,progress=None):
     if window not in ('24h','7d'): raise ValueError('統計期間只接受 24h 或 7d')
     current=current or datetime.now(timezone.utc)
-    since=current-timedelta(days=1 if window=='24h' else 7)
+    # Both report windows are built from this collection, regardless of which
+    # window the user is currently viewing.
+    since=current-timedelta(days=7)
     snapshot=service.store.snapshot() or {}
     stocks=snapshot.get('rows',[])
     if not stocks: raise ValueError('需要股票母集合才能辨識社群提及')

@@ -383,25 +383,27 @@ class MarketService(ResearchService):
 
     def reconcile_two_week(self,bundles,calendar):
         """Mature saved daily candidates without changing the original signal."""
-        existing=self.store.get('two_week_outcomes',[])
-        known={(x['snapshot_id'],x['symbol']) for x in existing}
+        existing={(x['snapshot_id'],x['symbol']):x for x in self.store.get('two_week_outcomes',[])
+                  if x.get('method_version')==TWO_WEEK_VERSION}
+        updated=[]
         for meta in self.store.history(limit=None):
             snap=self.store.snapshot(meta['id'])
             archived=snap.get('two_week',{})
             for candidate in archived.get('scored_universe',archived.get('research_candidates',[])):
                 key=(snap['id'],candidate['symbol'])
-                if key in known: continue
+                if key in existing:
+                    updated.append(existing[key])
+                    continue
                 rows=bundles.get(candidate['symbol'],{}).get('rows',[])
                 index=next((i for i,row in enumerate(rows) if row['date']==snap['as_of']),None)
                 if index is None: continue
                 result=two_week_outcome(rows,index,candidate['kind'],calendar)
                 if result['status']=='pending': continue
-                existing.append(dict(snapshot_id=snap['id'],signal_date=snap['as_of'],
-                                     symbol=candidate['symbol'],kind=candidate['kind'],
-                                     etf_style=candidate.get('etf_style'),rank_fraction=candidate.get('rank_fraction'),
-                                     score=candidate.get('score'),**result))
-                known.add(key)
-        self.store.put('two_week_outcomes',existing)
+                updated.append(dict(snapshot_id=snap['id'],signal_date=snap['as_of'],
+                                    symbol=candidate['symbol'],kind=candidate['kind'],
+                                    etf_style=candidate.get('etf_style'),rank_fraction=candidate.get('rank_fraction'),
+                                    score=candidate.get('score'),method_version=TWO_WEEK_VERSION,**result))
+        self.store.put('two_week_outcomes',updated)
 
     def _status(self,**kwargs):
         super()._status(**kwargs)
@@ -434,6 +436,8 @@ class MarketService(ResearchService):
         if previous and previous.get('data_signature')==signature:
             self.store.put('checked_at',now().isoformat())
             return previous
+        # Recompute outcomes from older tick rules before using them for validation.
+        self.reconcile_two_week(bundles,calendar)
         tasks=((info,bundles[info['symbol']],settings,calendar) for info in universe)
         results=[]
         def consume(iterator):
@@ -466,7 +470,6 @@ class MarketService(ResearchService):
         audit=self._reconcile(bundles,calendar,persist=False,evidence=[dict(snapshot_id=snapshot['id'],manifest_sha256=manifest_hash)],extra_snapshot=snapshot)
         atomic_json(self.root/'snapshots'/(snapshot['id']+'.json'),snapshot)
         self.store.save_snapshot(snapshot,audit=audit)
-        self.reconcile_two_week(bundles,calendar)
         self.compact_history()
         self.store.put('checked_at',now().isoformat())
         return snapshot

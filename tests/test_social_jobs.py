@@ -40,19 +40,23 @@ class SocialJobTests(unittest.TestCase):
             self.assertEqual(jobs.state()['status'],'failed')
             self.assertEqual(service.store.get('social_report'),{'collected_at':'old'})
 
-    def test_local_collection_uses_selected_period_without_personal_threads_token(self):
+    def test_first_24h_update_collects_seven_days_for_both_report_windows(self):
         from datetime import datetime,timezone,timedelta
         from social_update import update_social
         current=datetime(2026,9,29,12,tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as directory:
             service=SimpleNamespace(store=Store(directory))
             service.store.save_snapshot({'id':'s','as_of':'2026-09-29','created_at':'now','rows':[{'symbol':'2330','name':'台積電'}]})
-            with patch('social_update.collect_ptt',return_value=([],{'status':'partial'})) as ptt, \
+            older={'source':'ptt','id':'older','published_at':(current-timedelta(days=3)).isoformat(),'symbols':['2330']}
+            recent={'source':'ptt','id':'recent','published_at':(current-timedelta(hours=3)).isoformat(),'symbols':['2330']}
+            with patch('social_update.collect_ptt',return_value=([older,recent],{'status':'partial'})) as ptt, \
                  patch('social_update.collect_dcard',return_value=([],{'status':'failed','error':'HTTP 403'})) as dcard, \
                  patch('social_update.collect_threads') as official, \
                  patch('social_update.collect_threads_public',return_value=([],{'status':'not_configured'})) as public:
-                update_social(service,current=current,window='24h',local_public=True)
-            self.assertEqual(ptt.call_args.kwargs['since'],current-timedelta(hours=24))
+                report=update_social(service,current=current,window='24h',local_public=True)
+            self.assertEqual(ptt.call_args.kwargs['since'],current-timedelta(days=7))
+            self.assertEqual(report['windows']['24h'][0]['total'],1)
+            self.assertEqual(report['windows']['7d'][0]['total'],2)
             dcard.assert_called_once(); public.assert_called_once(); official.assert_not_called()
 
     def test_all_source_failures_keep_previous_report(self):

@@ -36,7 +36,7 @@ npx wrangler secret put UPDATE_KEY
 
 - Worker只允許 `https://hsinfuyeh.github.io` 網站來源；POST需更新密碼，固定儲存庫、main分支與工作流程，不能傳任意URL或儲存庫。
 - GitHub token僅Worker secret；更新密碼只在目前頁面記憶體。sessionStorage只存工作ID、scope與window，重新整理可續查，不保存密碼。
-- Durable Object串行觸發；已有主分支工作先等待。GitHub工作流程沿用同一concurrency群組，市場與社群使用同一份備份／快取。
+- Durable Object串行觸發並暫存剛派送的工作；GitHub 執行清單尚未顯示時會沿用原工作編號，派送結果不明時暫停再次送出。已有主分支工作先等待。GitHub工作流程沿用同一concurrency群組，市場與社群使用同一份備份／快取。
 - 15秒查詢工作狀態，工作含Pages部署步驟；部署成功才稱已發布，失敗保留既有已發布資料。
 - 社群單獨更新使用最近行情快照辨識，不重做全市場分析；若沒有完整快照則失敗並要求先更新行情。
 - 手動社群更新重試Dcard公開API（可能403）；Threads只走未登入公開路線，目前搜尋尚未接通，回傳unavailable。雲端搬遷不會解除平台限制。

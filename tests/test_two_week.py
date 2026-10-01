@@ -1,12 +1,13 @@
 import unittest
 import tempfile
 
-from marketlab.two_week import target_price, outcome, rank_candidates, eligible_asset, validate_ranker
+from marketlab.two_week import target_price, outcome, rank_candidates, eligible_asset, validate_ranker, VERSION
 from marketlab.service import MarketService
 from marketlab.data import listed_universe
 from marketlab.publish import export_site
 from pathlib import Path
 import json
+from unittest.mock import patch
 from test_analytics import bars, cal
 
 
@@ -21,6 +22,10 @@ class TwoWeekTests(unittest.TestCase):
         self.assertEqual(target_price(48.01, "stock"), 50.5)
         self.assertEqual(target_price(48.01, "etf"), 50.45)
         self.assertEqual(target_price(100, "stock"), 105)
+
+    def test_stock_target_uses_exchange_ticks_below_ten_and_below_five_hundred(self):
+        self.assertEqual(target_price(5.91, "stock"), 6.21)
+        self.assertEqual(target_price(150, "stock"), 157.5)
 
     def test_entry_is_day_one_and_touch_is_not_automatic_fill(self):
         rows=[bar(1),bar(2, high=105, close=104)]+[bar(i) for i in range(3,12)]
@@ -160,6 +165,41 @@ class TwoWeekTests(unittest.TestCase):
             export_site(service,Path(root)/"dist")
             public=json.loads((Path(root)/"dist/data/state.json").read_text(encoding="utf-8"))
             self.assertEqual(public["two_week_outcomes"],outcomes)
+
+    def test_legacy_target_outcome_is_recomputed_from_daily_bars(self):
+        all_rows=bars(81)
+        for row in all_rows: row['turnover']=30_000_000
+        class Client:
+            latest=65
+            def __init__(self,*args): self.evidence=[]
+            def universe(self): return [dict(symbol='2330',name='甲',kind='stock',currency='TWD')]
+            def calendar(self,*args): return cal(all_rows[:self.latest])
+            def market_bundles(self,*args): return {'2330':dict(rows=all_rows[:self.latest],issues=[])}
+        with tempfile.TemporaryDirectory() as root:
+            service=MarketService(root,client_factory=Client,workers=1)
+            service.update()
+            Client.latest=80
+            service.update()
+            legacy=dict(service.store.get('two_week_outcomes')[0],target_price=999,potential_fill=True)
+            legacy.pop('method_version',None)
+            service.store.put('two_week_outcomes',[legacy])
+            service.reconcile_two_week({'2330':dict(rows=all_rows,issues=[])},cal(all_rows))
+            repaired=service.store.get('two_week_outcomes')
+            self.assertEqual(len(repaired),1)
+            self.assertEqual(repaired[0]['target_price'],112.0)
+            self.assertEqual(repaired[0]['method_version'],VERSION)
+            service.store.put('two_week_outcomes',[legacy])
+            Client.latest=81
+            from marketlab import service as service_module
+            actual_rank=service_module.rank_candidates
+            seen=[]
+            def capture(symbols,as_of,history,calendar):
+                seen.extend(history)
+                return actual_rank(symbols,as_of,history,calendar)
+            with patch.object(service_module,'rank_candidates',side_effect=capture):
+                service.update()
+            self.assertEqual(seen[0]['target_price'],112.0)
+            self.assertEqual(seen[0]['method_version'],VERSION)
 
     def test_delisted_candidate_is_still_collected_for_maturity_check(self):
         fixture=bars(80)

@@ -5,16 +5,16 @@ from .analytics import adjusted, complete_window, features_at
 
 TARGET = Decimal("1.05")
 SESSIONS = 10
-VERSION = "two-week-v1"
+VERSION = "two-week-v2"
 
 
 def _tick(price, kind):
     if kind == "etf":
         return Decimal("0.01") if price < 50 else Decimal("0.05")
-    if price < 10: return Decimal("0.01") if price < 5 else Decimal("0.05")
+    if price < 10: return Decimal("0.01")
     if price < 50: return Decimal("0.05")
     if price < 100: return Decimal("0.1")
-    if price < 500: return Decimal("0.5") if price < 150 else Decimal("1")
+    if price < 500: return Decimal("0.5")
     return Decimal("1") if price < 1000 else Decimal("5")
 
 
