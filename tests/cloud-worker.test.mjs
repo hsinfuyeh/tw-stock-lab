@@ -2,15 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorker,UpdateCoordinator} from '../cloud/worker.mjs';
 
-const env={SITE_ORIGIN:'https://hsinfuyeh.github.io',GITHUB_REPOSITORY:'hsinfuyeh/tw-stock-lab',GITHUB_TOKEN:'private-github-token',UPDATE_KEY:'a-long-private-update-password'};
-const request=(body,key=env.UPDATE_KEY,origin=env.SITE_ORIGIN)=>new Request('https://update.example.com/update',{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
-test('cloud trigger rejects missing authorization and foreign origins without touching GitHub',async()=>{
+const env={SITE_ORIGIN:'https://hsinfuyeh.github.io',GITHUB_REPOSITORY:'hsinfuyeh/tw-stock-lab',GITHUB_TOKEN:'private-github-token'};
+const request=(body,origin=env.SITE_ORIGIN)=>new Request('https://update.example.com/update',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+test('cloud trigger rejects foreign browser origins without touching GitHub',async()=>{
   let calls=0;const worker=createWorker(async()=>{calls++;throw Error('unexpected');});
-  assert.equal((await worker.fetch(request({scope:'social',window:'24h'},'bad'),env)).status,401);
-  assert.equal((await worker.fetch(request({scope:'social',window:'24h'},env.UPDATE_KEY,'https://other.example'),env)).status,403);
+  assert.equal((await worker.fetch(request({scope:'social',window:'24h'},'https://other.example'),env)).status,403);
   assert.equal(calls,0);
 });
-test('cloud trigger validates scope, dispatches fixed main workflow and returns exact run ID',async()=>{
+test('public cloud trigger validates scope, dispatches fixed main workflow and returns exact run ID',async()=>{
   const calls=[];const worker=createWorker(async(url,options)=>{
     calls.push({url,options});
     if(url.includes('/dispatches'))return Response.json({workflow_run_id:42});

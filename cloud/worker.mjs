@@ -9,14 +9,6 @@ function jobFor(run,scope,window){
     error:!running&&run.conclusion!=='success'?'請查看 GitHub Actions 的失敗步驟。':null,
     url:`https://github.com/hsinfuyeh/tw-stock-lab/actions/runs/${run.id}`,sources:{}};
 }
-async function sameKey(supplied,expected){
-  if(!expected||expected.length<24||!supplied)return false;
-  const bytes=new TextEncoder();
-  const [a,b]=await Promise.all([supplied,expected].map(s=>crypto.subtle.digest('SHA-256',bytes.encode(s))));
-  let difference=0;const aa=new Uint8Array(a),bb=new Uint8Array(b);
-  for(let i=0;i<aa.length;i++)difference|=aa[i]^bb[i];
-  return difference===0;
-}
 export function createWorker(fetcher=fetch,state=null){
   return {async fetch(request,env){
     const origin=request.headers.get('Origin');
@@ -35,7 +27,6 @@ export function createWorker(fetcher=fetch,state=null){
     }
     try{
       if(url.pathname==='/update'&&request.method==='POST'){
-        if(!await sameKey(request.headers.get('Authorization')?.replace(/^Bearer /,''),env.UPDATE_KEY))return send(401,{error:'雲端更新密碼不正確'});
         if(request.headers.get('Content-Type')?.split(';')[0]!=='application/json')return send(415,{error:'需要 JSON'});
         const text=await request.text();if(text.length>1024)return send(400,{error:'請求過大'});
         let body;try{body=JSON.parse(text);}catch{return send(400,{error:'JSON 格式錯誤'});}

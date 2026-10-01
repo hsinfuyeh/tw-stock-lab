@@ -983,16 +983,6 @@ function bindEvents() {
 }
 
 let cloudClient = null;
-function requestCloudKey() {
-  const dialog=$('#cloudAuthDialog'),form=$('#cloudAuthForm'),input=$('#cloudUpdatePassword');
-  return new Promise(resolve=>{
-    let value=null;
-    const submit=event=>{event.preventDefault();value=input.value;dialog.close();};
-    const close=()=>{form.removeEventListener('submit',submit);input.value='';resolve(value);};
-    form.addEventListener('submit',submit);dialog.addEventListener('close',close,{once:true});
-    dialog.showModal();input.focus();
-  });
-}
 async function init() {
   $('#cloudUpdateLink').hidden = !STATIC_MODE;
   if (STATIC_MODE) {
@@ -1006,7 +996,7 @@ async function init() {
       const config=await fetchJSON('./cloud-config.json');
       if(config.endpoint){
         const {createCloudClient}=await import('./cloud.js');
-        cloudClient=createCloudClient(config.endpoint,requestCloudKey,fetchJSON,window.sessionStorage);
+        cloudClient=createCloudClient(config.endpoint,fetchJSON,window.sessionStorage);
         $('#updateButton .button-label').textContent='雲端更新行情';
         $('#updateButton').title='啟動雲端行情更新，完成發布後自動讀取新資料';
         $('#emptyUpdateButton').textContent='啟動雲端更新';
