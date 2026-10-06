@@ -63,6 +63,29 @@ GitHub Actions每日台灣19:15啟動（UTC11:15），22:47再補檢一次（UTC
 
 ## 本機驗證與執行
 
+### 本機研究開發分支
+
+目前研究升級使用 `local/research-upgrade`，預覽在 <http://127.0.0.1:8771/>。
+
+```powershell
+./launch-local-research.ps1                 # 開啟預覽；不自動抓全市場
+./launch-local-research.ps1 -NoBrowser      # 只啟動伺服器
+./launch-local-research.ps1 -Stop           # 依 PID 與命令列核對後停止
+```
+
+獨立資料在 `data/local-research-dev/`，PID、日誌與預覽截圖在 `logs/local-research/`，均不納入 Git。既有資料完整時，啟動工具會從 `dist` 匯入真實快照；已有開發資料時不覆蓋。來源缺日線或日期不一致時拒絕匯入，可明確執行下列官方資料初始化（使用專案 Python 環境）：
+
+```powershell
+python scripts/bootstrap_local_research.py  # 僅獨立目錄，官方最近兩個月
+./launch-local-research.ps1
+```
+
+首頁「市場與產業」只計普通股，分開顯示各指標分母；產業保留 TWSE 官方代碼，舊快照無分類顯示「未記錄」。新「績效與追蹤」按 `trade-policy-v1` 核對：次日開盤、最多十交易日、毛 +5% 保守出場、成本後報酬；前十名與同日全部合格集合按訊號日等權比較。GET `/api/research?id=<snapshot_id>` 只讀已保存資料，歷史日期不使用未來快照。
+
+2026-10-07 本機初始化取得資料截至 2026-10-06：1,263 檔（1,085 股票、178 ETF），產業分類缺漏 0。舊 `dist` 的 state 與 home 日期不一致且缺歷史／逐檔檔案，未冒充完整歷史匯入。新的 564 筆合格訊號剛封存，前十名皆等待後續行情，尚無成熟政策樣本。最近兩個月初始化不能代表 36 個月歷史驗證；日線未還原、可能漏公司行動，不能把模擬成交與候選績效當實際交易或预测準確率。
+
+本機「更新行情資料」沿用既有官方資料更新（36 個月，首次較慢），累積每日封存與後續核對。此階段未推送 GitHub、未觸發雲端工作、未部署或修改 Cloudflare。
+
 Python 3.12+、Node 22+：
 
 ```sh
