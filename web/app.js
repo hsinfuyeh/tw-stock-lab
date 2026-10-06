@@ -524,6 +524,7 @@ function renderAll() {
   renderJob();
   renderTwoWeek();
   renderView();
+  loadResearchReport();
   if (!STATIC_MODE) {
     renderHistory();
     renderRows();
@@ -751,12 +752,22 @@ async function ensureCatalog() {
   return appState.catalogLoading;
 }
 
+let researchController;
+async function loadResearchReport() {
+  if (!researchController) researchController=import('./research.js').then(({initResearch})=>initResearch({staticMode:STATIC_MODE,
+    fetchReport:id=>fetchJSON(`/api/research${id?`?id=${encodeURIComponent(id)}`:''}`),
+    openSecurity:openDetail,marketContainer:$('#localMarketSummary'),reportContainer:$('#researchReport')}));
+  $('#localMarketSummary').hidden=STATIC_MODE;
+  (await researchController).load(appState.snapshot?.id);
+}
+
 function renderView() {
   const views = {
     home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
     today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
     rankings: ['其他排行', '從成交金額、漲跌、量能與波動，探索同一資料日的市場表現。'],
     social: ['社群聲量', '觀察 PTT、Dcard、Threads 的公開股票討論，核對來源與提及篇數。'],
+    research: ['績效與追蹤', '核對原候選、固定交易規則、成本後結果與資料覆蓋。'],
   };
   appState.view = Object.hasOwn(views, location.hash.slice(1)) ? location.hash.slice(1) : 'home';
   const [title, copy] = views[appState.view];

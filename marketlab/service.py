@@ -394,6 +394,7 @@ class MarketService(ResearchService):
                     market_summary=selected.get('market_summary') or build_market_summary(selected),performance=performance,
                     tracking=sorted(records,key=lambda r:(r['signal_date'], -r['rank']),reverse=True),
                     baseline_missing_records=sum(not r['baseline_complete'] for r in records),
+                    local_import=self.store.get('local_import'),
                     note='訊號日先等權，再跨日等權；重疊候選實驗不是固定資金投資組合。未滿十日不納入完成績效。')
 
     def state(self):
