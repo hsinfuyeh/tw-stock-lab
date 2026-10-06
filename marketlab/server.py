@@ -29,6 +29,7 @@ def make_server(service,port=8765):
             request=urlparse(self.path); q=parse_qs(request.query)
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
+                if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/job": return self.send(200,{'job':service.store.get('job',service.job)})
                 if request.path=="/api/social":
                     from .social import empty_report
@@ -47,6 +48,7 @@ def make_server(service,port=8765):
                 if request.path not in files: return self.send(404,{"error":"找不到頁面"})
                 filename,mime=files[request.path]
                 return self.send(200,(web/filename).read_bytes(),mime+"; charset=utf-8")
+            except KeyError as exc: return self.send(404,{"error":str(exc)})
             except (ValueError,TypeError) as exc: return self.send(400,{"error":str(exc)})
             except Exception as exc: return self.send(500,{"error":str(exc)})
         def do_POST(self):

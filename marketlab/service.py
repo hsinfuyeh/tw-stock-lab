@@ -15,6 +15,7 @@ from .data import Store,TwseClient,MarketClient,atomic_json,json_text,month_list
 from .quality import PIPELINE_VERSION,describe_sources,quality_label
 from .two_week import rank_candidates,outcome as two_week_outcome,VERSION as TWO_WEEK_VERSION
 from .market_summary import build_market_summary,VERSION as SUMMARY_VERSION,CLASSIFICATION_VERSION
+from .performance import simulate_trade,summarize_performance,POLICY_VERSION
 
 DEFAULT_SETTINGS = dict(symbols=["2330","2317","2454","2308","2881","0050","0056","00878"],
                         months=36,min_samples=30,neighbors=60,min_turnover=20000000,min_probability=.55,
@@ -356,6 +357,44 @@ class MarketService(ResearchService):
 
     def settings(self):
         return dict(DEFAULT_SETTINGS,symbols=[],scope='all_listed_equity')
+
+    def research_report(self,snapshot_id=None):
+        """Read saved observations only; never fetch or mutate on a report GET."""
+        selected=self.store.snapshot(snapshot_id)
+        if not selected:
+            if snapshot_id: raise KeyError('找不到快照')
+            return dict(status='insufficient_data',as_of=None,snapshot_id=None,policy_version=POLICY_VERSION,
+                        market_summary=None,performance=summarize_performance([]),tracking=[])
+        as_of=selected['as_of'];version=selected.get('two_week',{}).get('version','unrecorded')
+        snapshots=[]
+        for meta in reversed(self.store.history(limit=None)):
+            if meta['as_of']<=as_of and (meta['created_at'],meta['id'])<=(selected['created_at'],selected['id']):
+                snapshots.append(self.store.snapshot(meta['id']))
+        bars={};actual=set()
+        for snap in snapshots:
+            actual.update(d for d in snap.get('calendar',{}).get('actual',[]) if d<=as_of)
+            for security in snap.get('rows',[]):
+                lookup=bars.setdefault(security['symbol'],{})
+                lookup.update({r['date']:r for r in security.get('bars',[]) if r['date']<=as_of})
+        calendar={'actual':sorted(actual)};seen_dates=set();records=[]
+        for snap in snapshots:
+            archived=snap.get('two_week',{})
+            if archived.get('version','unrecorded')!=version or snap['as_of'] in seen_dates: continue
+            seen_dates.add(snap['as_of'])
+            candidates=archived.get('scored_universe')
+            baseline_complete=candidates is not None
+            if candidates is None: candidates=archived.get('research_candidates',[])
+            evidence_id=hashlib.sha256(json_text(snap.get('evidence',[])).encode()).hexdigest()
+            for rank,candidate in enumerate(candidates,1):
+                result=simulate_trade(list(bars.get(candidate['symbol'],{}).values()),snap['as_of'],candidate['kind'],calendar,as_of)
+                records.append(dict(candidate,**result,rank=rank,snapshot_id=snap['id'],signal_date=snap['as_of'],
+                                    ranker_version=version,evidence_id=evidence_id,baseline_complete=baseline_complete))
+        performance=summarize_performance([r for r in records if r['baseline_complete']])
+        return dict(status='ready',snapshot_id=selected['id'],as_of=as_of,policy_version=POLICY_VERSION,ranker_version=version,
+                    market_summary=selected.get('market_summary') or build_market_summary(selected),performance=performance,
+                    tracking=sorted(records,key=lambda r:(r['signal_date'], -r['rank']),reverse=True),
+                    baseline_missing_records=sum(not r['baseline_complete'] for r in records),
+                    note='訊號日先等權，再跨日等權；重疊候選實驗不是固定資金投資組合。未滿十日不納入完成績效。')
 
     def state(self):
         state=super().state()
