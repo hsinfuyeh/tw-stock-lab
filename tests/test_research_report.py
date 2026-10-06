@@ -52,5 +52,35 @@ class ResearchReportTests(unittest.TestCase):
             with self.assertRaises(HTTPError) as e:urlopen(url+'?id=absent')
             self.assertEqual(e.exception.code,404)
         finally:server.shutdown();server.server_close();thread.join()
+    def test_completed_reports_survive_compaction_and_future_bar_expiry(self):
+        for i in (0,10,11):
+            s=self.snap(f's{i}',i)
+            for row in s['rows']:row['horizons']={}
+            self.service.store.save_snapshot(s)
+        before=self.service.research_report('s10')
+        for n in range(3):
+            s=self.snap(f'later{n}',11)
+            for row in s['rows']:row['horizons']={}
+            self.service.store.save_snapshot(s)
+        self.service.compact_history()
+        self.assertEqual(self.service.research_report('s10'),before)
+        future=self.snap('future',11)
+        future['as_of']='2026-04-01';future['calendar']['actual'].append('2026-04-01')
+        for row in future['rows']:row.update(horizons={},bars=[])
+        self.service.store.save_snapshot(future);self.service.compact_history()
+        result=next(r for r in self.service.research_report()['tracking'] if r['signal_date']==self.dates[0])
+        self.assertEqual(result['status'],'evaluated')
+        self.assertEqual(result['net_return_pct'],before['tracking'][-1]['net_return_pct'])
+    def test_outcome_evidence_identifies_actual_bar_sources_and_input(self):
+        s=self.snap('a',0);s['evidence']=[{'url':'signal','sha256':'a'}];self.service.store.save_snapshot(s)
+        s=self.snap('b',11);s['evidence']=[{'url':'future-bars','sha256':'b'}];s['rows'][0]['bars'][1]['high']=106
+        self.service.store.save_snapshot(s)
+        r=next(r for r in self.service.research_report()['tracking'] if r['snapshot_id']=='a')
+        self.assertEqual(r['simulation_evidence']['source_snapshot_ids'],['b'])
+        self.assertEqual(len(r['simulation_evidence']['bars']),10)
+        original_hash=r['simulation_evidence']['input_sha256']
+        s=self.snap('c',11);s['rows'][0]['bars'][1]['high']=104;self.service.store.save_snapshot(s)
+        revised=next(r for r in self.service.research_report()['tracking'] if r['snapshot_id']=='a')
+        self.assertNotEqual(revised['simulation_evidence']['input_sha256'],original_hash)
 
 if __name__=='__main__':unittest.main()

@@ -19,3 +19,7 @@ test('performance contains day weighting, baseline and unavailable factor',()=>{
   const html=researchMarkup({performance:{stock:{top10:summary,baseline:summary,paired_difference_pct:0}},tracking:[]});
   assert.match(html,/1.00%/);assert.match(html,/同日全部合格/);assert.match(html,/日等權/);assert.match(html,/—/);
 });
+test('industry counts and classification date are visible without tooltips',()=>{
+  const html=marketMarkup({classification_sources:[{url:'official',retrieved_at:'2026-01-21'}],industries:[{industry:'24',total:10,valid_count:10,momentum20_count:1,momentum20_small_sample:true,turnover_count:8,median_20_return_pct:4}]});
+  assert.match(html,/2026-01-21/);assert.match(html,/>1\/10 檔/);assert.match(html,/>8\/10 檔/);assert.match(html,/20 日樣本偏少/);
+});

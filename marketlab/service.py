@@ -358,8 +358,15 @@ class MarketService(ResearchService):
     def settings(self):
         return dict(DEFAULT_SETTINGS,symbols=[],scope='all_listed_equity')
 
+    def _research_key(self,identifier):
+        return f'research_report:{POLICY_VERSION}:{SUMMARY_VERSION}:{identifier}'
+
     def research_report(self,snapshot_id=None):
         """Read saved observations only; never fetch or mutate on a report GET."""
+        identifier=snapshot_id or self.store.get('latest')
+        cached=self.store.get(self._research_key(identifier)) if identifier else None
+        if cached:
+            cached['local_import']=self.store.get('local_import');return cached
         selected=self.store.snapshot(snapshot_id)
         if not selected:
             if snapshot_id: raise KeyError('找不到快照')
@@ -370,12 +377,19 @@ class MarketService(ResearchService):
         for meta in reversed(self.store.history(limit=None)):
             if meta['as_of']<=as_of and (meta['created_at'],meta['id'])<=(selected['created_at'],selected['id']):
                 snapshots.append(self.store.snapshot(meta['id']))
-        bars={};actual=set()
+        bars={};actual=set();bar_sources={};prior_results={};manifests={}
         for snap in snapshots:
+            manifests[snap['id']]=hashlib.sha256(json_text(snap.get('evidence',[])).encode()).hexdigest()
+            saved=self.store.get(self._research_key(snap['id']))
+            if saved and saved.get('ranker_version')==version:
+                for r in saved['tracking']:
+                    if r['status']!='pending': prior_results[(r['signal_date'],r['symbol'])]=r
             actual.update(d for d in snap.get('calendar',{}).get('actual',[]) if d<=as_of)
             for security in snap.get('rows',[]):
                 lookup=bars.setdefault(security['symbol'],{})
-                lookup.update({r['date']:r for r in security.get('bars',[]) if r['date']<=as_of})
+                usable=[r for r in security.get('bars',[]) if isinstance(r,dict) and isinstance(r.get('date'),str) and r['date']<=as_of]
+                lookup.update({r['date']:r for r in usable})
+                bar_sources.update({(security['symbol'],r['date']):snap['id'] for r in usable})
         calendar={'actual':sorted(actual)};seen_dates=set();records=[]
         for snap in snapshots:
             archived=snap.get('two_week',{})
@@ -387,11 +401,21 @@ class MarketService(ResearchService):
             evidence_id=hashlib.sha256(json_text(snap.get('evidence',[])).encode()).hexdigest()
             for rank,candidate in enumerate(candidates,1):
                 result=simulate_trade(list(bars.get(candidate['symbol'],{}).values()),snap['as_of'],candidate['kind'],calendar,as_of)
-                records.append(dict(candidate,**result,rank=rank,snapshot_id=snap['id'],signal_date=snap['as_of'],
-                                    ranker_version=version,evidence_id=evidence_id,baseline_complete=baseline_complete))
+                prior=prior_results.get((snap['as_of'],candidate['symbol']))
+                if prior and result['status']=='not_comparable' and '缺' in result['reason']:
+                    retained=copy.deepcopy(prior);retained['elapsed_sessions']=result['elapsed_sessions'];records.append(retained);continue
+                dates=[d for d in calendar['actual'] if d>snap['as_of']][:10]
+                inputs=[bars[candidate['symbol']][d] for d in dates if d in bars.get(candidate['symbol'],{})]
+                source_ids=sorted({bar_sources[(candidate['symbol'],r['date'])] for r in inputs})
+                input_hash=hashlib.sha256(json_text(dict(policy_version=POLICY_VERSION,kind=candidate['kind'],signal_date=snap['as_of'],dates=dates,bars=inputs)).encode()).hexdigest()
+                original={k:copy.deepcopy(candidate[k]) for k in ('symbol','name','kind','etf_style','score','reasons') if k in candidate}
+                records.append(dict(original,**result,rank=rank,snapshot_id=snap['id'],signal_date=snap['as_of'],
+                                    ranker_version=version,evidence_id=evidence_id,baseline_complete=baseline_complete,
+                                    simulation_evidence=dict(input_sha256=input_hash,source_snapshot_ids=source_ids,
+                                        source_manifests={sid:manifests[sid] for sid in source_ids},actual_dates=dates,bars=inputs)))
         performance=summarize_performance([r for r in records if r['baseline_complete']])
         return dict(status='ready',snapshot_id=selected['id'],as_of=as_of,policy_version=POLICY_VERSION,ranker_version=version,
-                    market_summary=selected.get('market_summary') or build_market_summary(selected),performance=performance,
+                    market_summary=selected['market_summary'] if selected.get('market_summary',{}).get('version')==SUMMARY_VERSION else build_market_summary(selected),performance=performance,
                     tracking=sorted(records,key=lambda r:(r['signal_date'], -r['rank']),reverse=True),
                     baseline_missing_records=sum(not r['baseline_complete'] for r in records),
                     local_import=self.store.get('local_import'),
@@ -407,6 +431,11 @@ class MarketService(ResearchService):
 
     def compact_history(self):
         """Keep all original predictions; retain detailed diagnostics for latest three."""
+        # Materialize each point-in-time report before any of its input bars expire.
+        # Later reports carry completed results with their exact inputs and sources.
+        for meta in reversed(self.store.history(limit=None)):
+            key=self._research_key(meta['id'])
+            if self.store.get(key) is None:self.store.put(key,self.research_report(meta['id']))
         changed=False
         for meta in self.store.history(limit=None)[3:]:
             snap=self.store.snapshot(meta['id'])

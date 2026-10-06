@@ -4,7 +4,7 @@ from statistics import mean, median
 import math
 from .analytics import adjusted, complete_window
 
-VERSION='market-summary-v1'
+VERSION='market-summary-v1.1'
 CLASSIFICATION_VERSION='official-industry-v1'
 
 def _turnover(row):
@@ -18,7 +18,7 @@ def build_market_summary(snapshot):
     groups=defaultdict(list);metrics=[]
     candidates={r['symbol'] for r in snapshot.get('two_week',{}).get('research_candidates',[])}
     for security in stocks:
-        lookup={r['date']:r for r in security.get('bars',[]) if r['date']<=as_of}
+        lookup={r['date']:r for r in security.get('bars',[]) if isinstance(r,dict) and isinstance(r.get('date'),str) and r['date']<=as_of}
         current=lookup.get(as_of)
         item=dict(symbol=security['symbol'],industry=security.get('industry') or '未記錄',
                   daily=None,ma20=None,momentum20=None,turnover=None,previous_turnover=None,
@@ -61,6 +61,9 @@ def build_market_summary(snapshot):
             advancing_ratio=mean(r['daily']>1e-9 for r in valid) if valid else None,
             turnover_share=sum(turnover)/total_turnover if turnover and total_turnover>0 else None,
             median_20_return_pct=median(momentum) if momentum else None,momentum20_count=len(momentum),
-            turnover_count=len(turnover),candidate_count=sum(r['candidate'] for r in items)))
+            turnover_count=len(turnover),momentum20_small_sample=len(momentum)<5,
+            turnover_small_sample=len(turnover)<5,candidate_count=sum(r['candidate'] for r in items)))
+    sources=sorted({(r.get('industry_source'),r.get('industry_retrieved_at')) for r in stocks if r.get('industry_source') and r.get('industry_retrieved_at')})
     return dict(as_of=as_of,version=VERSION,coverage=coverage,market=market,industries=industries,
-                classification_missing=sum(r['industry']=='未記錄' for r in metrics))
+                classification_missing=sum(r['industry']=='未記錄' for r in metrics),
+                classification_sources=[dict(url=url,retrieved_at=timestamp) for url,timestamp in sources])

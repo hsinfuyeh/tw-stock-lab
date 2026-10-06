@@ -42,5 +42,12 @@ class MarketSummaryTests(unittest.TestCase):
     def test_official_industry_is_retained(self):
         result=listed_universe([{'公司代號':'2330','公司簡稱':'台積電','產業別':'24'}],{'status':'success','data':[{'stockNo':'0050','stockName':'台灣50','listingDate':'2003.06.30'}]})
         self.assertEqual(next(r for r in result if r['symbol']=='2330')['industry'],'24')
+    def test_industry_windows_have_separate_small_samples_and_provenance(self):
+        s=self.snapshot();s['rows'][0]['bars']=s['rows'][0]['bars'][-2:]
+        s['rows'][0].update(industry_source='official-company-master',industry_retrieved_at='2026-01-21T20:00:00')
+        r=build_market_summary(s);industry=r['industries'][0]
+        self.assertTrue(industry['momentum20_small_sample'])
+        self.assertEqual(industry['momentum20_count'],2)
+        self.assertEqual(r['classification_sources'][0]['retrieved_at'],'2026-01-21T20:00:00')
 
 if __name__=='__main__':unittest.main()
