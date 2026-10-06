@@ -259,7 +259,7 @@ def listed_universe(companies, etfs):
         listing_date=iso_date(listed[:4]+'-'+listed[4:6]+'-'+listed[6:8]) if len(listed)==8 else None
         if symbol in catalog: raise ValueError('上市公司清單重複代號')
         catalog[symbol]=dict(symbol=symbol,name=row.get('公司簡稱') or row.get('公司名稱') or symbol,
-                             kind='stock',listing_date=listing_date,currency='TWD')
+                             kind='stock',listing_date=listing_date,currency='TWD',industry=str(row.get('產業別','')).strip() or None)
     for row in etfs['data']:
         symbol=str(row.get('stockNo','')).strip()
         # 004xxA active equity and new six-digit funds are included. B/L/R are not vanilla equity.
@@ -302,8 +302,13 @@ def parse_market_day(payload, session):
 class MarketClient(TwseClient):
     def universe(self):
         companies=self.fetch('listed-companies','https://openapi.twse.com.tw/v1/opendata/t187ap03_L',3600)
+        evidence=next((e for e in reversed(self.evidence) if 't187ap03_L' in e['url']),{})
         etfs=self.fetch('equity-etfs','https://www.twse.com.tw/zh/ETFortune/ajaxProductsResult?assetType=Stock&rewardType=Vanilla',3600)
-        return listed_universe(companies,etfs)
+        universe=listed_universe(companies,etfs)
+        for info in universe:
+            if info['kind']=='stock':
+                info.update(industry_source=evidence.get('url'),industry_retrieved_at=evidence.get('fetched_at'))
+        return universe
 
     def market_bundles(self,universe,calendar):
         bundles={r['symbol']:dict(rows=[],issues=[]) for r in universe}

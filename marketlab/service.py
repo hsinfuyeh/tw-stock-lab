@@ -14,6 +14,7 @@ from .analytics import HORIZONS,MODEL_VERSION,ResearchModel,event_outcome
 from .data import Store,TwseClient,MarketClient,atomic_json,json_text,month_list,now
 from .quality import PIPELINE_VERSION,describe_sources,quality_label
 from .two_week import rank_candidates,outcome as two_week_outcome,VERSION as TWO_WEEK_VERSION
+from .market_summary import build_market_summary,VERSION as SUMMARY_VERSION,CLASSIFICATION_VERSION
 
 DEFAULT_SETTINGS = dict(symbols=["2330","2317","2454","2308","2881","0050","0056","00878"],
                         months=36,min_samples=30,neighbors=60,min_turnover=20000000,min_probability=.55,
@@ -430,8 +431,9 @@ class MarketService(ResearchService):
         bundles=client.market_bundles(list(collection.values()),calendar)
         as_of=calendar['actual'][-1]
         # Hash content rather than fetch timestamps: a holiday refresh need not recompute.
-        signature=hashlib.sha256(json_text(dict(universe=universe,calendar=calendar,settings=settings,
-            sources=[(e['url'],e['sha256']) for e in client.evidence],version=MODEL_VERSION,pipeline=TWO_WEEK_VERSION)).encode()).hexdigest()
+        signature=hashlib.sha256(json_text(dict(universe=[{k:v for k,v in r.items() if k!='industry_retrieved_at'} for r in universe],calendar=calendar,settings=settings,
+            sources=[(e['url'],e['sha256']) for e in client.evidence],version=MODEL_VERSION,pipeline=TWO_WEEK_VERSION,
+            summary_version=SUMMARY_VERSION,classification_version=CLASSIFICATION_VERSION)).encode()).hexdigest()
         previous=self.store.snapshot()
         if previous and previous.get('data_signature')==signature:
             self.store.put('checked_at',now().isoformat())
@@ -453,6 +455,11 @@ class MarketService(ResearchService):
             unavailable_count=unavailable,stocks=sum(r['kind']=='stock' for r in universe),etfs=sum(r['kind']=='etf' for r in universe))
         two_week=rank_candidates([dict(info,rows=bundles[info['symbol']]['rows']) for info in universe],
                                  as_of,self.store.get('two_week_outcomes',[]),calendar)
+        # A corrected same-day analysis does not create a new original signal.
+        for meta in reversed(self.store.history(limit=None)):
+            archived=self.store.snapshot(meta['id'])
+            if archived['as_of']==as_of and archived.get('two_week',{}).get('version')==TWO_WEEK_VERSION:
+                two_week=copy.deepcopy(archived['two_week']);break
         snapshot=dict(id=now().strftime('%Y%m%dT%H%M%S')+'-'+uuid4().hex[:8],as_of=as_of,created_at=now().isoformat(),
             model_version=MODEL_VERSION,data_signature=signature,scope='all_listed_equity',coverage=coverage,two_week=two_week,
             methodology='上市普通股及官方分類之股票型原型ETF；六期限按資料日起算曆日，休市順延。訊號後下一交易日開盤模擬進場，成本後未還原價格報酬；股票賣出稅0.3%、ETF0.1%，雙邊手續費0.1425%及滑價0.05%。',
@@ -465,6 +472,7 @@ class MarketService(ResearchService):
             settings=settings,rows=results,summary=dict(count=len(results),eligible={str(h):sum(r['horizons'][str(h)]['eligible'] for r in results) for h in HORIZONS}),
             evidence=client.evidence,calendar=calendar)
         snapshot['data_quality']=describe_sources(snapshot['evidence'],as_of,snapshot['created_at'])
+        snapshot['market_summary']=build_market_summary(snapshot)
         # Shared evidence is stored once per snapshot; outcomes reference its content hash.
         manifest_hash=hashlib.sha256(json_text(client.evidence).encode()).hexdigest()
         audit=self._reconcile(bundles,calendar,persist=False,evidence=[dict(snapshot_id=snapshot['id'],manifest_sha256=manifest_hash)],extra_snapshot=snapshot)
