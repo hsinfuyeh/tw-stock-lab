@@ -38,6 +38,17 @@
 
 ## 驗證紀錄
 
-測試與本機官方更新日誌位於 `logs/local-research/stage-two-python.log`、`stage-two-node.log`、`stage-two-official-update.log`（忽略於 Git）。完整 Python 155 / 155，Node 55 / 55。API GET read-only、更新並行鎖、單來源失敗、時間排除、更正及回復版本、固定排序與區塊統計、前端轉義和非同步競態均有測試。
+測試與本機官方更新日誌位於 `logs/local-research/stage-two-python.log`、`stage-two-node.log`、`stage-two-official-update.log`（忽略於 Git）。最後完整 Python 156 / 156，Node 57 / 57。API GET read-only、更新並行鎖、單來源失敗、時間排除、更正及回復版本、固定排序與區塊統計、前端轉義和非同步競態均有測試。
+
+獨立程式審查（唯讀）發現三個 Important 問題，均以失敗回歸重現後修正：歷史壓縮後改用不可變原特徵封存，未保留輸入不推定原先缺資料；相同快照背景輪詢不再丟棄個股資料請求；研究表在手機保留表格欄名。沒有 Critical、延期 Minor 或未判斷項目。
+
+桌面 1366px 檢查搜尋 2330 與官方詳情；0050 的 API 顯示營收不適用。390px 瀏覽器實測修正前 `thead=none/table=block`，修正後 `thead=table-header-group/table=table`，整頁 scrollWidth=390、clientWidth=390，橫捲僅在研究表內。更新按鈕實際啟動成功；重複快取更新法人、營收新增觀測均為零。背景更新結束後，實際 shadow GET 前後資料庫位元組相同。瀏覽器唯一資源錯誤為未提供的 favicon，不影響功能。
+
+## 本次實作決定與代價
+
+1. Windows 採 PowerShell 記錄任務、基準 commit 與測試日誌，代替技能的 Bash 輔助腳本；若記錄方式有誤，代價為補齊紀錄。
+2. 依使用者授權，2A 與固定 2B 直接完成、不安排中間設計審閱；若設計取捨需調整，代價為修改本機版本，沒有部署影響。
+3. 實驗定義提前在收集工作凍結，shadow GET 待比較模組完成才加入，確保定義早於首次資料取得；若定義需改，代價為另開實驗版本。
+4. 本機首次啟用後，在行情快照產製前收集新來源，壓縮前封存原特徵，避免事後資料混入；代價為每次本機行情更新多一輪官方請求。
 
 未推送 GitHub、未觸發 Actions、未部署 Cloudflare；保留本機開發分支及伺服器。

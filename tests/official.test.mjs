@@ -40,3 +40,14 @@ test('summary and shadow failures are independent and old load cannot replace ne
   resolvers[0].resolve({summary:{sources:{}},as_of:'old'});resolvers[1].resolve({});await first;
   assert.match(summary.innerHTML,/new/);assert.ok(!summary.innerHTML.includes('old'));assert.ok(!shadow.innerHTML.includes('<bad>'));
 });
+test('same snapshot polling does not invalidate an outstanding detail',async()=>{
+  let resolveDetail;const box={innerHTML:''};
+  const ctl=initOfficial({fetchJSON:url=>url.includes('symbol=')?new Promise(resolve=>resolveDetail=resolve):Promise.resolve({summary:{sources:{}},job:{},days:[]})});
+  await ctl.load('one');const detail=ctl.detail('2330','one',box);
+  await ctl.load('one');resolveDetail({detail:{sources:{}},signal_cutoff:'retained'});await detail;
+  assert.match(box.innerHTML,/retained/);assert.ok(!box.innerHTML.includes('正在讀取'));
+});
+test('compacted unknown inputs are not described as originally missing features',()=>{
+  const html=detailMarkup({features_status:'unavailable_inputs',features:null,detail:{sources:{}}});
+  assert.match(html,/無法重新核對/);assert.ok(!html.includes('當時影子特徵不足'));
+});

@@ -22,7 +22,10 @@ export function summaryMarkup(report){
 
 export function detailMarkup(report){
   const sources=report?.detail?.sources||{},f=report?.current_features;
-  return `<h3>官方籌碼／營收／事件</h3><p class="research-muted">以下為目前取得的回顧資料。原訊號決策時刻：${esc(report?.signal_cutoff)}；${report?.features?.eligible?'當時具備完整影子特徵':'當時影子特徵不足，不回填過去訊號'}。</p>
+  const availability=report?.features_status==='not_applicable'?'ETF 不適用本批普通股影子規則':
+    report?.features_status==='unavailable_inputs'?'原快照行情明細未保留，無法重新核對特徵；不推定當時缺資料':
+    report?.features?.eligible?'當時具備完整影子特徵':'當時影子特徵不足，不回填過去訊號';
+  return `<h3>官方籌碼／營收／事件</h3><p class="research-muted">以下為目前取得的回顧資料。原訊號決策時刻：${esc(report?.signal_cutoff)}；${availability}。</p>
     ${f?`<p>回顧五日法人淨買：${num(f.institution_net_5)} 股 · 占同期成交股數 ${f.institution_ratio_5==null?'—':pct(f.institution_ratio_5*100)} · 連續買超 ${num(f.buy_streak)} 日</p>`:''}
     ${Object.entries(sources).map(([source,data])=>`<details class="method-details" ${source==='institution'||source==='revenue'?'open':''}><summary>${names[source]||esc(source)} · ${states[data.status]||esc(data.status)}</summary><div class="method-body">${data.error?`<p class="research-warning">${esc(data.error)}</p>`:''}${(data.rows||[]).map(row=>{
       const v=row.values||{};let body='';
@@ -46,9 +49,13 @@ export function shadowMarkup(report){
 }
 
 export function initOfficial({fetchJSON,summaryContainer=null,shadowContainer=null,staticMode=false,setTimer=setTimeout}){
-  let generation=0,detailGeneration=0,currentId=null,updating=false;
+  let generation=0,detailGeneration=0,currentId=null,updating=false,activeDetail=null;
   async function load(id){
-    currentId=id;const token=++generation;++detailGeneration;
+    if(currentId!==id){
+      ++detailGeneration;
+      if(activeDetail)activeDetail.innerHTML='<p class="research-muted">快照已變更，請重新開啟個股詳情。</p>';
+    }
+    currentId=id;const token=++generation;
     if(staticMode){if(summaryContainer)summaryContainer.hidden=true;if(shadowContainer)shadowContainer.innerHTML='<p class="research-muted">官方研究與影子比較限本機開發版。</p>';return;}
     const suffix=id?`?id=${encodeURIComponent(id)}`:'';
     const results=await Promise.allSettled([fetchJSON(`/api/official${suffix}`),fetchJSON(`/api/shadow${suffix}`)]);
@@ -59,6 +66,7 @@ export function initOfficial({fetchJSON,summaryContainer=null,shadowContainer=nu
   }
   async function detail(symbol,id,container){
     const token=++detailGeneration;
+    activeDetail=container;
     if(staticMode){container.innerHTML='<p class="research-muted">官方研究資料限本機開發版。</p>';return;}
     container.innerHTML='<p class="research-muted">正在讀取官方研究資料…</p>';
     try{const report=await fetchJSON(`/api/official?symbol=${encodeURIComponent(symbol)}${id?`&id=${encodeURIComponent(id)}`:''}`);if(token===detailGeneration)container.innerHTML=detailMarkup(report);}

@@ -60,6 +60,35 @@ class OfficialJobsTests(unittest.TestCase):
         self.assertEqual(self.jobs.state()['status'],'partial')
         self.assertEqual(len(self.jobs.official.query('institution')),1)
 
+    def test_archived_feature_availability_survives_compaction(self):
+        from marketlab.shadow import archive_signal
+        from marketlab.data import json_text
+        days=['2026-10-01','2026-10-02','2026-10-05','2026-10-06','2026-10-07']
+        snapshot=dict(id='full',as_of=days[-1],created_at='2026-10-07T19:01:00+08:00',
+            calendar={'actual':days},rows=[dict(symbol='2330',kind='stock',bars=[dict(date=d,volume=100) for d in days])],
+            two_week={'scored_universe':[dict(symbol='2330',kind='stock')]})
+        evidence=dict(fetched_at='2026-10-07T18:00:00+08:00',sha256='a'*64,file='fixture.json',url='https://www.twse.com.tw/')
+        institution=[dict(symbol='2330',key=d,data_date=d,period=None,published_at=None,unit='shares',values={'total_net':10}) for d in days]
+        revenue=dict(symbol='2330',key='2026-08',data_date='2026-08-01',period='2026-08',published_at=None,
+            unit='amount_unverified',values={'yoy_pct':5})
+        self.jobs.official.ingest('institution',institution,evidence)
+        self.jobs.official.ingest('revenue',[revenue],evidence)
+        self.service.store.save_snapshot(snapshot);archive_signal(self.service.store,snapshot)
+        snapshot['rows'][0].pop('bars');snapshot['detail_retention']='forecast_only'
+        with self.service.store.connect() as conn:
+            conn.execute('UPDATE snapshots SET payload=? WHERE id=?',(json_text(snapshot),'full'))
+        report=self.jobs.report('2330','full')
+        self.assertTrue(report['features']['eligible'])
+        self.assertEqual(report['features_status'],'archived')
+        self.assertEqual(report['features']['institution_ratio_5'],.1)
+        self.service.store.put('shadow_signal:unrelated',{})
+        # A compacted non-candidate has no retained feature evidence, not evidence of missing features.
+        snapshot['rows'].append(dict(symbol='2317',kind='stock'))
+        with self.service.store.connect() as conn:
+            conn.execute('UPDATE snapshots SET payload=? WHERE id=?',(json_text(snapshot),'full'))
+        unknown=self.jobs.report('2317','full')
+        self.assertIsNone(unknown['features']);self.assertEqual(unknown['features_status'],'unavailable_inputs')
+
     def test_get_and_post_guards(self):
         server=make_server(self.service,0)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()

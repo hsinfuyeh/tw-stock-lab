@@ -106,8 +106,18 @@ class OfficialJobs:
             report['detail']=self.official.detail(symbol,kind,as_of=snap['as_of'])
             report['signal_detail']=self.official.detail(symbol,kind,cutoff=snap['created_at'],as_of=snap['as_of'])
             report['signal_cutoff']=snap['created_at']
-            report['features']=self.official.features(symbol,snap['as_of'],snap['created_at'],
-                snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])) if kind=='stock' else None
+            from .shadow import DEFINITION_HASH
+            archive=self.service.store.get('shadow_signal:'+DEFINITION_HASH+':'+snap['id']) or {}
+            retained=next((r['features'] for r in archive.get('rows',[]) if r['symbol']==symbol),None)
+            if kind!='stock':
+                report.update(features=None,features_status='not_applicable')
+            elif retained is not None:
+                report.update(features=retained,features_status='archived')
+            elif snap.get('detail_retention')=='forecast_only':
+                report.update(features=None,features_status='unavailable_inputs')
+            else:
+                report.update(features=self.official.features(symbol,snap['as_of'],snap['created_at'],
+                    snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])),features_status='computed')
             report['current_features']=self.official.features(symbol,snap['as_of'],now().isoformat(),
                 snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])) if kind=='stock' else None
         return report

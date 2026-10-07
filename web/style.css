@@ -715,3 +715,10 @@ th, td, .sample-table th, .sample-table td,
 .official-observation small { display: block; color: var(--muted, #646d69); }
 .official-announcement { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .official-header .button { width: 100%; } }
+/* Preserve labels and columns inside research scroll containers on mobile. */
+.research-table { display: table; }
+.research-table thead { display: table-header-group; }
+.research-table tbody { display: table-row-group; }
+.research-table tr { display: table-row; }
+.research-table th, .research-table td { display: table-cell; }
+.research-table td::before { display: none; }
