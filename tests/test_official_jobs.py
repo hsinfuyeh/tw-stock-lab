@@ -4,7 +4,7 @@ import threading
 import json
 from urllib.request import urlopen, Request
 from marketlab.service import MarketService
-from marketlab.official_jobs import OfficialJobs
+from marketlab.official_jobs import OfficialJobs, collect_for_market
 from marketlab.official import T86_FIELDS, MARGIN_FIELDS
 from marketlab.server import make_server
 
@@ -54,12 +54,19 @@ class OfficialJobsTests(unittest.TestCase):
         recovered=OfficialJobs(self.service,FakeClient)
         self.assertEqual(recovered.state()['status'],'interrupted')
 
+    def test_local_enabled_market_collection(self):
+        self.service.store.put('official_enabled',True)
+        collect_for_market(self.service,self.service.store.snapshot()['calendar'],FakeClient)
+        self.assertEqual(self.jobs.state()['status'],'partial')
+        self.assertEqual(len(self.jobs.official.query('institution')),1)
+
     def test_get_and_post_guards(self):
         server=make_server(self.service,0)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         base=f'http://127.0.0.1:{server.server_port}'
         try:
             with urlopen(base+'/api/official') as response: self.assertIn('summary',json.load(response))
+            with urlopen(base+'/api/shadow') as response: self.assertEqual(json.load(response)['status'],'insufficient_data')
             from urllib.error import HTTPError
             request=Request(base+'/api/official/update',data=b'{"bad":1}',headers={'Content-Type':'application/json'})
             with self.assertRaises(HTTPError) as err: urlopen(request)

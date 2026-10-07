@@ -436,6 +436,9 @@ class MarketService(ResearchService):
         for meta in reversed(self.store.history(limit=None)):
             key=self._research_key(meta['id'])
             if self.store.get(key) is None:self.store.put(key,self.research_report(meta['id']))
+            if self.store.get('official_enabled'):
+                from .shadow import archive_signal
+                archive_signal(self.store,self.store.snapshot(meta['id']))
         changed=False
         for meta in self.store.history(limit=None)[3:]:
             snap=self.store.snapshot(meta['id'])
@@ -499,6 +502,10 @@ class MarketService(ResearchService):
                 collection.setdefault(candidate['symbol'],candidate)
         bundles=client.market_bundles(list(collection.values()),calendar)
         as_of=calendar['actual'][-1]
+        if self.store.get('official_enabled'):
+            from .official_jobs import collect_for_market
+            self._status(phase='官方研究資料',message='收集法人、信用交易、營收、公告及除權息線索')
+            collect_for_market(self,calendar)
         # Hash content rather than fetch timestamps: a holiday refresh need not recompute.
         signature=hashlib.sha256(json_text(dict(universe=[{k:v for k,v in r.items() if k!='industry_retrieved_at'} for r in universe],calendar=calendar,settings=settings,
             sources=[(e['url'],e['sha256']) for e in client.evidence],version=MODEL_VERSION,pipeline=TWO_WEEK_VERSION,

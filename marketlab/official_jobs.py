@@ -39,6 +39,7 @@ class OfficialJobs:
                 # Freeze the definition before collecting any experiment data.
                 from .shadow import freeze_definition
                 freeze_definition(self.service.store)
+                self.service.store.put('official_enabled',True)
                 job=dict(running=True,status='running',started_at=now().isoformat(),sources={},
                     as_of=snapshot['as_of'],error=None)
                 self.service.store.put('official_job',job)
@@ -86,7 +87,8 @@ class OfficialJobs:
         finally:
             job.update(running=False,finished_at=now().isoformat())
             try: self.service.store.put('official_job',job)
-            finally: lock.__exit__(None,None,None)
+            finally:
+                if lock is not None: lock.__exit__(None,None,None)
 
     def report(self, symbol=None, snapshot_id=None):
         snap=self.service.store.snapshot(snapshot_id)
@@ -103,3 +105,13 @@ class OfficialJobs:
             report['features']=self.official.features(symbol,snap['as_of'],snap['created_at'],
                 snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])) if kind=='stock' else None
         return report
+
+
+def collect_for_market(service, calendar, client_factory=TwseClient):
+    """Called only within MarketService's existing OS lock, after local opt-in."""
+    if not service.store.get('official_enabled'): return
+    from .shadow import freeze_definition
+    freeze_definition(service.store)
+    jobs=OfficialJobs(service,client_factory)
+    service.store.put('official_job',dict(running=True,status='running',started_at=now().isoformat(),sources={},error=None))
+    jobs._run(dict(as_of=calendar['actual'][-1],calendar=calendar),None)

@@ -34,6 +34,9 @@ def make_server(service,port=8765):
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
                 if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})
+                if request.path=="/api/shadow":
+                    from .shadow import shadow_report
+                    return self.send(200,shadow_report(service,q.get('id',[None])[0],official_jobs.official))
                 if request.path=="/api/job": return self.send(200,{'job':service.store.get('job',service.job)})
                 if request.path=="/api/social":
                     from .social import empty_report
