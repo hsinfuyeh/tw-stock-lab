@@ -51,7 +51,7 @@ def make_server(service,port=8765):
                 if request.path=="/api/reconciled": return self.send(200,service.store.get("reconciled",[]))
                 if request.path=="/api/export":
                     return self.send(200,service.export_csv(int(q.get("horizon",[7])[0]),q.get("sort",["expected_return"])[0],q.get("id",[None])[0]),"text/csv; charset=utf-8")
-                files={"/":("index.html","text/html"),"/index.html":("index.html","text/html"),"/app.js":("app.js","text/javascript"),"/social.js":("social.js","text/javascript"),"/research.js":("research.js","text/javascript"),"/style.css":("style.css","text/css")}
+                files={"/":("index.html","text/html"),"/index.html":("index.html","text/html"),"/app.js":("app.js","text/javascript"),"/social.js":("social.js","text/javascript"),"/research.js":("research.js","text/javascript"),"/official.js":("official.js","text/javascript"),"/style.css":("style.css","text/css")}
                 if request.path not in files: return self.send(404,{"error":"找不到頁面"})
                 filename,mime=files[request.path]
                 return self.send(200,(web/filename).read_bytes(),mime+"; charset=utf-8")

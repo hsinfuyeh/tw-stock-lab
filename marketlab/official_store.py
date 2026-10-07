@@ -43,12 +43,15 @@ class OfficialStore:
                 count += 1
         return count
 
-    def query(self, source=None, symbol=None, cutoff=None, as_of=None):
+    def query(self, source=None, symbol=None, cutoff=None, as_of=None, symbols=None):
         limit_time = instant(cutoff) if cutoff else None
         if as_of: date.fromisoformat(as_of)
         clauses, args = [], []
         for column, value in (('source',source),('symbol',symbol)):
             if value is not None: clauses.append(column+'=?'); args.append(value)
+        if symbols is not None:
+            if not symbols: return []
+            clauses.append('symbol IN ('+','.join('?' for _ in symbols)+')');args.extend(sorted(symbols))
         sql = 'SELECT payload FROM official_observations'
         if clauses: sql += ' WHERE '+' AND '.join(clauses)
         sql += ' ORDER BY id'
@@ -63,16 +66,17 @@ class OfficialStore:
 
     def health(self): return self.store.get('official_health', {})
 
-    def summary(self):
+    def summary(self, symbols=None):
         health = self.health()
         # Count latest observations, never join source lists into a made-up universe.
-        rows = self.query()
+        rows = self.query(symbols=symbols)
         result = {}
         for source in SOURCES:
             subset = [r for r in rows if r['source'] == source]
             result[source] = dict(health.get(source, {}), covered_symbols=len({r['symbol'] for r in subset}),
                 latest_data_date=max((r['data_date'] for r in subset),default=None),
                 observations=len(subset), status=health.get(source,{}).get('status','not_collected'))
+            if symbols is not None: result[source]['universe_symbols']=len(symbols)
         return dict(version=VERSION,sources=result,notes=[
             '首次取得時間為保守可用時刻；今日補抓舊資料不納入過去訊號。',
             '法人單位為股；信用交易為交易單位；營收金額單位尚未核對，僅顯示官方增減率。',

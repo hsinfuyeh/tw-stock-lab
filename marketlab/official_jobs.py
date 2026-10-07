@@ -67,6 +67,8 @@ class OfficialJobs:
                         payload=client.fetch(key,url,max_age=3600,
                             validate=lambda p,s=source,d=dt: parse_source(s,p,d))
                         rows=parse_source(source,payload,dt)
+                        universe={r['symbol'] for r in snapshot.get('rows',[]) }
+                        if universe: rows=[r for r in rows if r['symbol'] in universe]
                         new_count+=self.official.ingest(source,rows,copy.deepcopy(client.evidence[-1]))
                         batches+=1
                     except Exception as exc:
@@ -93,8 +95,10 @@ class OfficialJobs:
     def report(self, symbol=None, snapshot_id=None):
         snap=self.service.store.snapshot(snapshot_id)
         if snapshot_id and not snap: raise KeyError('找不到快照')
-        report=dict(summary=self.official.summary(),job=self.state(),snapshot_id=snap['id'] if snap else None,
+        report=dict(summary=self.official.summary({r['symbol'] for r in snap.get('rows',[])} if snap else set()),job=self.state(),snapshot_id=snap['id'] if snap else None,
             as_of=snap['as_of'] if snap else None)
+        if snap:
+            report['summary']['sources']['revenue']['universe_symbols']=sum(r['kind']=='stock' for r in snap.get('rows',[]))
         if symbol:
             rows={r['symbol']:r for r in (snap or {}).get('rows',[])}
             if symbol not in rows: raise KeyError('快照沒有此代號')
@@ -103,6 +107,8 @@ class OfficialJobs:
             report['signal_detail']=self.official.detail(symbol,kind,cutoff=snap['created_at'],as_of=snap['as_of'])
             report['signal_cutoff']=snap['created_at']
             report['features']=self.official.features(symbol,snap['as_of'],snap['created_at'],
+                snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])) if kind=='stock' else None
+            report['current_features']=self.official.features(symbol,snap['as_of'],now().isoformat(),
                 snap.get('calendar',{}).get('actual',[]),rows[symbol].get('bars',[])) if kind=='stock' else None
         return report
 
@@ -114,4 +120,5 @@ def collect_for_market(service, calendar, client_factory=TwseClient):
     freeze_definition(service.store)
     jobs=OfficialJobs(service,client_factory)
     service.store.put('official_job',dict(running=True,status='running',started_at=now().isoformat(),sources={},error=None))
-    jobs._run(dict(as_of=calendar['actual'][-1],calendar=calendar),None)
+    jobs._run(dict(as_of=calendar['actual'][-1],calendar=calendar,
+        rows=service.store.get('universe') or (service.store.snapshot() or {}).get('rows',[])),None)

@@ -525,6 +525,7 @@ function renderAll() {
   renderTwoWeek();
   renderView();
   loadResearchReport();
+  loadOfficialReport();
   if (!STATIC_MODE) {
     renderHistory();
     renderRows();
@@ -753,6 +754,16 @@ async function ensureCatalog() {
 }
 
 let researchController;
+let officialController;
+async function getOfficialController() {
+  if (!officialController) officialController=import('./official.js').then(({initOfficial})=>initOfficial({
+    fetchJSON,staticMode:STATIC_MODE,summaryContainer:$('#officialSummary'),shadowContainer:$('#shadowReport')}));
+  return officialController;
+}
+async function loadOfficialReport() {
+  $('#officialSummary').hidden=STATIC_MODE;
+  (await getOfficialController()).load(appState.snapshot?.id);
+}
 async function loadResearchReport() {
   if (!researchController) researchController=import('./research.js').then(({initResearch})=>initResearch({staticMode:STATIC_MODE,
     fetchReport:id=>fetchJSON(`/api/research${id?`?id=${encodeURIComponent(id)}`:''}`),
@@ -900,8 +911,10 @@ async function openDetail(symbol) {
     <section class="detail-section"><div class="detail-section-header"><h3>篩選條件與排除原因</h3><span>期間最低收盤報酬第 10 百分位 ${formatPercent(horizon?.worst_close_q10)}</span></div><div class="reason-list">${reasons.length ? reasons.map((reason) => `<span class="reason-chip">${escapeHtml(reason)}</span>`).join('') : '<span class="reason-chip neutral">此期限未列排除原因</span>'}</div></section>
     <section class="detail-section"><div class="detail-section-header"><h3>近期訊號</h3><span>黃點標在 K 線圖</span></div><div class="reason-list">${signalsHtml}</div></section>
     <section class="detail-section"><div class="detail-section-header"><h3>相似歷史樣本</h3><span>共 ${formatInteger(horizon?.n)} 筆</span></div>${samplesHtml}</section>
-    <section class="detail-section"><div class="detail-section-header"><h3>驗證紀錄</h3><span>比例仍屬歷史估計</span></div>${validationHtml}</section>`;
+    <section class="detail-section"><div class="detail-section-header"><h3>驗證紀錄</h3><span>比例仍屬歷史估計</span></div>${validationHtml}</section>
+    <section class="detail-section" id="officialDetail"></section>`;
   $('#detailDialog').showModal();
+  (await getOfficialController()).detail(symbol,appState.snapshot?.id,$('#officialDetail'));
 }
 
 function bindEvents() {

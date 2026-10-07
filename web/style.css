@@ -708,3 +708,10 @@ th, td, .sample-table th, .sample-table td,
   .explore-table tbody tr.is-expanded td.security-cell { padding-left: 22px; }
   .social-table tbody tr:not(.is-expanded) td:nth-child(3)::before { font-size: 10px; }
 }
+/* Local official context and prospective shadow research. */
+.official-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.official-shadow { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line, #deded8); }
+.official-observation { padding: 12px 0; border-bottom: 1px solid var(--line, #deded8); overflow-wrap: anywhere; }
+.official-observation small { display: block; color: var(--muted, #646d69); }
+.official-announcement { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .official-header .button { width: 100%; } }
