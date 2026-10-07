@@ -10,6 +10,8 @@ def make_server(service,port=8765):
     web=Path(__file__).resolve().parent.parent/"web"
     from .social_jobs import SocialJobs
     social_jobs=SocialJobs(service)
+    from .official_jobs import OfficialJobs
+    official_jobs=OfficialJobs(service)
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def send(self,status,payload,content_type="application/json; charset=utf-8"):
@@ -30,6 +32,8 @@ def make_server(service,port=8765):
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
+                if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
+                if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})
                 if request.path=="/api/job": return self.send(200,{'job':service.store.get('job',service.job)})
                 if request.path=="/api/social":
                     from .social import empty_report
@@ -62,6 +66,9 @@ def make_server(service,port=8765):
                 length=int(self.headers.get("Content-Length","0"))
                 if not 0<length<=16384: raise ValueError("請求內容大小錯誤")
                 body=json.loads(self.rfile.read(length))
+                if self.path=="/api/official/update":
+                    if not isinstance(body,dict) or body: raise ValueError('官方資料更新只接受空 JSON 物件')
+                    return self.send(202,{'job':official_jobs.start()})
                 if self.path=="/api/social/update":
                     if not isinstance(body,dict) or set(body)!={'window'}: raise ValueError('只接受統計期間 window')
                     return self.send(202,{'job':social_jobs.start(body['window'])})
