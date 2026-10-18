@@ -485,7 +485,14 @@ class MarketService(ResearchService):
     def _run(self):
         from concurrent.futures import ProcessPoolExecutor
         settings=self.settings()
-        client=self.client_factory(self.root,lambda symbol,session:self._status(phase='下載全市場',message=f'{symbol} {session}'))
+        def download_progress(label,session):
+            counts=re.fullmatch(r'全市場 (\d+)/(\d+)',label)
+            fields={}
+            if counts:
+                completed,total=map(int,counts.groups())
+                if 0<=completed<=total and total>0: fields=dict(progress=completed,total=total)
+            self._status(phase='下載全市場',message=f'{label} {session}',**fields)
+        client=self.client_factory(self.root,download_progress)
         client.refresh_recent=True
         universe=client.universe()
         calendar=client.calendar(month_list(settings['months']))
