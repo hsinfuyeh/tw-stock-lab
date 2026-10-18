@@ -94,8 +94,13 @@
       </details>
     </section>
     <section class="workspace rankings-workspace" id="rankingsView" data-view="rankings" aria-labelledby="marketRankingTitle" hidden>
-      <div class="section-heading"><div><p class="section-kicker">同日市場觀察</p><h2 id="marketRankingTitle">其他排行</h2></div><span class="result-count">7 種排行</span></div>
-      <div class="rankings-layout">
+      <div class="section-heading"><div><p class="section-kicker">量價・法人・公開討論</p><h2 id="marketRankingTitle">其他排行</h2></div><span class="result-count">三類觀察排行</span></div>
+      <nav id="rankingGroupNav" class="ranking-group-nav" aria-label="排行類別">
+        <button class="button" type="button" data-ranking-group="market" aria-pressed="true">量價排行</button>
+        <button class="button" type="button" data-ranking-group="institution" aria-pressed="false">法人籌碼</button>
+        <button class="button" type="button" data-ranking-group="social" aria-pressed="false">社群聲量</button>
+      </nav>
+      <div class="rankings-layout" id="marketRankingPanel">
         <nav id="marketRankNav" class="rank-nav" aria-label="排行分類"></nav>
         <div class="rank-content"><h3 id="marketRankTitle">成交金額</h3><p id="marketRankNote" class="search-hint"></p>
           <p id="marketRankSummary" class="explore-summary" aria-live="polite">正在讀取排行…</p>
@@ -105,8 +110,8 @@
         </div>
         <p id="sourceChecked" class="source-checked" hidden></p>
       </div>
-    </section>
-    <section id="socialView" class="workspace" data-view="social" aria-labelledby="socialTitle" hidden>
+      <section id="institutionRankingPanel" class="institution-ranking-panel" aria-label="法人買超賣超與買賣總量排行" hidden></section>
+    <section id="socialView" class="social-ranking-panel" aria-labelledby="socialTitle" hidden>
       <div class="section-heading"><div><p class="section-kicker">公開討論觀察</p><h2 id="socialTitle">社群聲量排行</h2></div><button class="button button-primary" data-social-update>立即更新社群</button></div>
       <div class="social-context-desktop"><p class="search-hint">依觀察到的不同主貼文篇數排序。同篇提及同股票只算一次，不含留言及圖片文字；討論多不代表看多。平台搜尋與收集上限造成取樣差異，非全平台完整聲量。</p><div class="social-sources" data-social-status></div></div>
       <details class="social-context-mobile"><summary>來源狀態與取樣說明</summary><p class="search-hint">同篇提及同股票只算一次，不含留言及圖片文字；討論多不代表看多。平台搜尋與收集上限造成取樣差異，非全平台完整聲量。</p><div class="social-sources" data-social-status-mobile></div></details>
@@ -119,6 +124,7 @@
       <div data-social-results></div>
       <div class="pagination" data-social-pager hidden><button class="button button-quiet" data-social-prev>上一頁</button><span data-social-page></span><button class="button button-quiet" data-social-next>下一頁</button></div>
       <section class="social-evidence" data-social-evidence-panel hidden><div class="section-heading"><h3 data-social-evidence-title></h3><button class="button button-quiet" data-social-close>收起依據</button></div><ul data-social-evidence-list></ul></section>
+    </section>
     </section>
     <details class="legacy-research" hidden><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">

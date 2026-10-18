@@ -1,6 +1,11 @@
 export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
 export const PAGE_SIZE = 15;
 
+export function rankingGroupForRoute(route) {
+  const groups={rankings:'market','rankings-institution':'institution',social:'social'};
+  return Object.hasOwn(groups,route)?groups[route]:null;
+}
+
 export function searchSecurities(rows, query) {
   const clean = value => String(value || '').normalize('NFKC').replaceAll('臺', '台').toLowerCase().trim();
   const q = clean(query);
@@ -214,7 +219,7 @@ const METRICS = {
 
 const appState = {
   view: 'home', catalog: [], catalogId: null, catalogLoading: null, catalogError: '',
-  homeQuery: '', homePage: 1, rankKey: 'amount', rankPage: 1,
+  homeQuery: '', homePage: 1, rankKey: 'amount', rankPage: 1, rankGroup: 'market',
   snapshot: null,
   settings: null,
   history: [],
@@ -776,26 +781,46 @@ function renderView() {
   const views = {
     home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
     today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
-    rankings: ['其他排行', '從成交金額、漲跌、量能與波動，探索同一資料日的市場表現。'],
-    social: ['社群聲量', '觀察 PTT、Dcard、Threads 的公開股票討論，核對來源與提及篇數。'],
+    rankings: ['其他排行', '整合量價排行、三大法人買超／賣超與買賣總量，以及公開社群聲量；各自標示資料日期與來源。'],
     research: ['績效與追蹤', '核對原候選、固定交易規則、成本後結果與資料覆蓋。'],
   };
-  appState.view = Object.hasOwn(views, location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  const route=location.hash.slice(1),rankGroup=rankingGroupForRoute(route);
+  if(rankGroup)appState.rankGroup=rankGroup;
+  appState.view = rankGroup?'rankings':Object.hasOwn(views, route)?route:'home';
   const [title, copy] = views[appState.view];
   $('#pageTitle').textContent = title;
   $('.hero .lede').textContent = copy;
   document.title = `${title} · 臺股研究台`;
-  $('.hero .eyebrow').textContent=appState.view==='social'?'臺股社群研究 · 公開討論觀察':'臺股盤後研究 · 十個交易日觀察期';
-  $('#snapshotCard').hidden = appState.view === 'social';
+  $('.hero .eyebrow').textContent='臺股盤後研究 · 十個交易日觀察期';
+  $('#snapshotCard').hidden = false;
   $$('[data-view]').forEach(el => { el.hidden = el.dataset.view !== appState.view; });
   $$('[data-view-link]').forEach(el => {
     if (el.dataset.viewLink === appState.view) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
   });
   renderExplorer();
+  renderRankingGroup();
   if (appState.view !== 'today') ensureCatalog();
-  if (appState.view === 'social') loadSocialView();
-  if (appState.view === 'social'&&!appState.job?.running) $('#jobPanel').hidden=true;
+  if (appState.view === 'rankings'&&appState.rankGroup === 'social'&&!appState.job?.running) $('#jobPanel').hidden=true;
+}
+
+let institutionViewPromise;
+async function loadInstitutionView() {
+  if(!institutionViewPromise)institutionViewPromise=import('./institutions.js').then(({createInstitutionView})=>
+    createInstitutionView($('#institutionRankingPanel'),fetchJSON,STATIC_MODE));
+  try{await (await institutionViewPromise).load(appState.snapshot?.id);}
+  catch{$('#institutionRankingPanel').textContent='法人排行載入失敗，請重新整理。';institutionViewPromise=null;}
+}
+
+function renderRankingGroup() {
+  const group=appState.rankGroup;
+  $('#marketRankingPanel').hidden=group!=='market';
+  $('#institutionRankingPanel').hidden=group!=='institution';
+  $('#socialView').hidden=group!=='social';
+  $$('#rankingGroupNav [data-ranking-group]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.rankingGroup===group)));
+  if(appState.view!=='rankings')return;
+  if(group==='institution')loadInstitutionView();
+  if(group==='social')loadSocialView();
 }
 
 let socialViewPromise;
@@ -919,6 +944,10 @@ async function openDetail(symbol) {
 
 function bindEvents() {
   window.addEventListener('hashchange', renderView);
+  $('#rankingGroupNav').addEventListener('click',event=>{
+    const group=event.target.closest('[data-ranking-group]')?.dataset.rankingGroup;
+    if(group)location.hash=({market:'rankings',institution:'rankings-institution',social:'social'})[group];
+  });
   $('#stockSearch').addEventListener('input', event => {
     appState.homeQuery = event.target.value; appState.homePage = 1; renderExplorer();
   });

@@ -5,6 +5,15 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 
+test('ranking group routes keep legacy social links in the combined rankings view',async()=>{
+  const {rankingGroupForRoute}=await import(moduleUrl);
+  assert.equal(rankingGroupForRoute('rankings'),'market');
+  assert.equal(rankingGroupForRoute('rankings-institution'),'institution');
+  assert.equal(rankingGroupForRoute('social'),'social');
+  assert.equal(rankingGroupForRoute('home'),null);
+  for(const route of ['constructor','__proto__','toString'])assert.equal(rankingGroupForRoute(route),null);
+});
+
 test('social pages exclude unavailable sources, use per-platform ranks, and cap at ten', async () => {
   const {socialPage}=await import('../web/social.js');
   const rows=Array.from({length:23},(_,i)=>({symbol:String(i),total:23-i,counts:{ptt:23-i,dcard:null,threads:null}}));

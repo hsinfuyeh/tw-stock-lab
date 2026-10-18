@@ -28,6 +28,16 @@ class HttpTests(unittest.TestCase):
         with urlopen(self.base+'/api/social') as response: social=json.load(response)
         self.assertIsNone(social['collected_at'])
         self.assertEqual(social['sources'],{})
+    def test_institution_rankings_readonly_route_validation(self):
+        before=self.service.store.path.read_bytes()
+        with urlopen(self.base+'/api/institutions?sessions=5') as response:
+            report=json.load(response)
+        self.assertEqual(report['status'],'insufficient_data')
+        self.assertEqual(self.service.store.path.read_bytes(),before)
+        with self.assertRaises(HTTPError) as err: urlopen(self.base+'/api/institutions?sessions=20')
+        self.assertEqual(err.exception.code,400)
+        with self.assertRaises(HTTPError) as err: urlopen(self.base+'/api/institutions?id=absent')
+        self.assertEqual(err.exception.code,404)
     def test_settings_persist_and_bad_values_do_not_overwrite(self):
         params=dict(DEFAULT_SETTINGS,min_probability=.6)
         req=Request(self.base+"/api/settings",json.dumps(params).encode(),{"Content-Type":"application/json"})

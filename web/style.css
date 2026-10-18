@@ -722,3 +722,17 @@ th, td, .sample-table th, .sample-table td,
 .research-table tr { display: table-row; }
 .research-table th, .research-table td { display: table-cell; }
 .research-table td::before { display: none; }
+.ranking-group-nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 26px; }
+.ranking-group-nav [aria-pressed="true"] { background: var(--teal); color: white; border-color: var(--teal); }
+.institution-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-bottom: 24px; }
+.institution-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--ink-soft); }
+.institution-controls select { padding: 10px; border: 1px solid var(--line-dark); border-radius: 8px; color: var(--ink); background: var(--white); max-width: 100%; }
+.institution-ranking-panel,.social-ranking-panel { min-width: 0; }
+.institution-table .institution-selected { background: var(--teal-pale); font-weight: 650; }
+@media(max-width:700px) {
+  .ranking-group-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .ranking-group-nav .button { padding: 10px 6px; min-width: 0; }
+  .institution-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .institution-controls label { min-width: 0; }
+  .institution-controls .button { align-self: end; }
+}
