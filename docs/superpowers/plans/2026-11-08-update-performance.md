@@ -41,4 +41,3 @@ Produces reconcilePublishedJob(job, publication), pure function.
 ## Review Focus
 
 Floating point/stable ordering parity, sparse date axes and revised outcomes; model array lifetime with immutable input assumptions; archive member names and links; invalid and timezone-free timestamps; old social job never masked by market publication; no accidental credential output or remote deployment.
-
