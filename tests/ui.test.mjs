@@ -5,6 +5,13 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../web/app.js', import.meta.url), 'utf8');
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 
+test('failed job does not render a full completion bar or success label',async()=>{
+  const {jobProgress}=await import(moduleUrl);
+  assert.deepEqual(jobProgress({running:false,error:'failure'}),{ratio:0,fraction:'失敗'});
+  assert.deepEqual(jobProgress({running:false,error:'failure',progress:100,total:100}),{ratio:99,fraction:'失敗 · 100 / 100'});
+  assert.deepEqual(jobProgress({running:false}),{ratio:100,fraction:'完成'});
+});
+
 test('ranking group routes keep legacy social links in the combined rankings view',async()=>{
   const {rankingGroupForRoute}=await import(moduleUrl);
   assert.equal(rankingGroupForRoute('rankings'),'market');

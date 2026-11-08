@@ -491,6 +491,13 @@ function renderRows() {
   }).join('');
 }
 
+export function jobProgress(job){
+  const total=finiteNumber(job.total)??0,progress=finiteNumber(job.progress)??0;
+  const observed=total>0?Math.max(0,Math.min(100,progress/total*100)):(job.running?8:100);
+  return {ratio:job.error?(total>0?Math.min(99,observed):0):observed,
+    fraction:job.error?`失敗${total>0?` · ${progress} / ${total}`:''}`:total>0?`${progress} / ${total}`:job.running?'處理中':'完成'};
+}
+
 function renderJob() {
   const job = appState.job;
   const panel = $('#jobPanel');
@@ -505,12 +512,10 @@ function renderJob() {
     return;
   }
   panel.hidden = false;
-  const total = finiteNumber(job.total) ?? 0;
-  const progress = finiteNumber(job.progress) ?? 0;
-  const ratio = total > 0 ? Math.max(0, Math.min(100, progress / total * 100)) : (job.running ? 8 : 100);
-  $('#jobPhase').textContent = job.error ? '更新未完成' : job.running ? (job.phase || '更新中') : '更新完成';
+  const {ratio,fraction}=jobProgress(job);
+  $('#jobPhase').textContent = job.error ? '更新未完成' : job.status==='superseded'?job.phase:job.running ? (job.phase || '更新中') : '更新完成';
   $('#jobMessage').textContent = job.error || job.message || (job.running ? '正在處理資料…' : `完成於 ${formatDate(job.finished_at, true)}`);
-  $('#jobFraction').textContent = total ? `${progress} / ${total}` : job.running ? '處理中' : '完成';
+  $('#jobFraction').textContent = fraction;
   $('#jobProgress').style.width = `${ratio}%`;
   $('.spinner').hidden = !job.running;
   setUpdateButtons(Boolean(job.running));
@@ -573,7 +578,7 @@ async function loadState({ quiet = false } = {}) {
     appState.twoWeekOutcomes = payload.two_week_outcomes ?? [];
     let cloudStatusError='';
     if (STATIC_MODE && cloudClient) {
-      try { const job=await cloudClient.status();appState.job=job.scope==='social'?null:job; }
+      try { const job=await cloudClient.status(payload);appState.job=job.scope==='social'?null:job; }
       catch(error){appState.job=null;cloudStatusError=`雲端進度暫時無法讀取：${error.message}`;}
     } else appState.job=payload.job??null;
     appState.universe = payload.universe ?? [];
