@@ -6,6 +6,7 @@ import tarfile
 import tempfile
 import unittest
 import io
+import os
 
 SCRIPT=Path(__file__).resolve().parents[1]/'scripts/state_archive.py'
 spec=importlib.util.spec_from_file_location('state_archive',SCRIPT)
@@ -41,5 +42,18 @@ class StateArchiveTests(unittest.TestCase):
             result=subprocess.run([sys.executable,str(SCRIPT),'restore',str(filename)],cwd=temp,capture_output=True)
             self.assertNotEqual(result.returncode,0)
             self.assertFalse((Path(temp)/'data').exists())
+
+    def test_local_hardlinked_files_remain_safely_restorable_regular_members(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'source';root.mkdir();original=root/'original.json';original.write_bytes(b'public evidence')
+            try: os.link(original,root/'second.json')
+            except OSError as error: self.skipTest('Filesystem does not support hard links: '+str(error))
+            filename=Path(temp)/'linked.tar.gz';archive_module.pack_state(filename,root=root)
+            with tarfile.open(filename) as reader:
+                self.assertTrue(all(member.isfile() for member in reader.getmembers()))
+            destination=Path(temp)/'restore';destination.mkdir()
+            result=subprocess.run([sys.executable,str(SCRIPT),'restore',str(filename)],cwd=destination,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual((destination/'data/second.json').read_bytes(),original.read_bytes())
 
 if __name__=='__main__': unittest.main()

@@ -1,6 +1,14 @@
 // Only non-secret run references are stored for progress after a reload.
 export function reconcilePublishedJob(job,publication){
-  const instant=value=>typeof value==='string'&&/(?:Z|[+-]\d{2}:\d{2})$/.test(value)?Date.parse(value):NaN;
+  const instant=value=>{
+    const parts=typeof value==='string'&&/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+    if(!parts)return NaN;
+    const [year,month,day,hour,minute,second]=parts.slice(1).map(Number);
+    const leap=year%4===0&&(year%100!==0||year%400===0);
+    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+    if(month<1||month>12||day<1||day>days[month-1]||hour>23||minute>59||second>59)return NaN;
+    return Date.parse(value);
+  };
   if(!job||job.running||!job.error||!['market','all'].includes(job.scope))return job;
   const published=instant(publication?.checked_at),failed=instant(job.finished_at);
   if(!Number.isFinite(published)||!Number.isFinite(failed)||published<=failed)return job;

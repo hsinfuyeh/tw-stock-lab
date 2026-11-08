@@ -24,6 +24,15 @@ test('resumed status can reconcile against publication without deleting cloud re
   assert.equal((await client.status({checked_at:'2026-11-08T00:00:00Z'})).status,'superseded');
   assert.ok(saved.get('tw-stock-cloud-job'));
 });
+test('impossible calendar dates and normalized midnight never hide failures',()=>{
+  const failure={scope:'market',running:false,error:'keep visible',finished_at:'2026-01-01T00:00:00Z'};
+  for(const value of ['2026-02-30T00:00:00Z','2026-02-29T00:00:00Z','2026-11-08T24:00:00Z']){
+    assert.equal(reconcilePublishedJob(failure,{checked_at:value}),failure);
+    const invalid={...failure,finished_at:value};
+    assert.equal(reconcilePublishedJob(invalid,{checked_at:'2026-12-01T00:00:00Z'}),invalid);
+  }
+  assert.equal(reconcilePublishedJob(failure,{checked_at:'2028-02-29T23:59:59.123+08:00'}).status,'superseded');
+});
 
 test('cloud client starts a public update without a password and resumes the run',async()=>{
   const saved=new Map();const store={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v),removeItem:k=>saved.delete(k)};

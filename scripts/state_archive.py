@@ -8,7 +8,7 @@ def pack_state(filename,root=Path('data'),compresslevel=1):
     """Keep the same restorable evidence; spend less CPU on gzip compression."""
     root=Path(root)
     if not root.exists(): return
-    with tarfile.open(filename,'w:gz',compresslevel=compresslevel) as archive:
+    with tarfile.open(filename,'w:gz',compresslevel=compresslevel,dereference=True) as archive:
         for path in root.rglob('*'):
             relative=path.relative_to(root)
             if path.is_file() and not path.is_symlink() and 'snapshots' not in relative.parts and path.name not in ('update.lock','market-bundles.json'):
