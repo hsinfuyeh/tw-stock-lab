@@ -12,11 +12,11 @@ test('failed job does not render a full completion bar or success label',async()
   assert.deepEqual(jobProgress({running:false}),{ratio:100,fraction:'完成'});
 });
 
-test('ranking group routes keep legacy social links in the combined rankings view',async()=>{
+test('ranking group routes keep institution links and let social have its own page',async()=>{
   const {rankingGroupForRoute}=await import(moduleUrl);
   assert.equal(rankingGroupForRoute('rankings'),'market');
   assert.equal(rankingGroupForRoute('rankings-institution'),'institution');
-  assert.equal(rankingGroupForRoute('social'),'social');
+  assert.equal(rankingGroupForRoute('social'),null);
   assert.equal(rankingGroupForRoute('home'),null);
   for(const route of ['constructor','__proto__','toString'])assert.equal(rankingGroupForRoute(route),null);
 });

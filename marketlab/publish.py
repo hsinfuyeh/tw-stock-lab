@@ -16,7 +16,7 @@ def export_site(service,output):
     for source in (Path(__file__).resolve().parents[1]/'web').iterdir():
         if source.is_file(): shutil.copyfile(source,output/source.name)
     app=(output/'app.js').read_text(encoding='utf-8')
-    for module in ('social.js','cloud.js'):
+    for module in ('social.js','cloud.js','intraday.js'):
         version=hashlib.sha256((output/module).read_bytes()).hexdigest()[:12]
         app=app.replace(f"import('./{module}')",f"import('./{module}?v={version}')")
     (output/'app.js').write_text(app,encoding='utf-8')

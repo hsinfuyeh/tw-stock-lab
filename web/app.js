@@ -2,7 +2,7 @@ export const HORIZONS = ['1', '3', '5', '7', '14', '30'];
 export const PAGE_SIZE = 15;
 
 export function rankingGroupForRoute(route) {
-  const groups={rankings:'market','rankings-institution':'institution',social:'social'};
+  const groups={rankings:'market','rankings-institution':'institution'};
   return Object.hasOwn(groups,route)?groups[route]:null;
 }
 
@@ -785,19 +785,21 @@ async function loadResearchReport() {
 function renderView() {
   const views = {
     home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
-    today: ['今日名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
-    rankings: ['其他排行', '整合量價排行、三大法人買超／賣超與買賣總量，以及公開社群聲量；各自標示資料日期與來源。'],
+    today: ['建議名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
+    intraday: ['盤中排行', '查看上市股票與 ETF 的盤中漲跌、量價及開盤觀察；行情未連線時會明確標示。'],
+    rankings: ['其他排行', '查看盤後量價與三大法人買超／賣超、買進／賣出總量排行。'],
+    social: ['社群聲量', '觀察公開討論名單、提及篇數與原文依據；各平台資料時間及涵蓋範圍分別標示。'],
     research: ['績效與追蹤', '核對原候選、固定交易規則、成本後結果與資料覆蓋。'],
   };
   const route=location.hash.slice(1),rankGroup=rankingGroupForRoute(route);
   if(rankGroup)appState.rankGroup=rankGroup;
   appState.view = rankGroup?'rankings':Object.hasOwn(views, route)?route:'home';
-  const [title, copy] = views[appState.view];
-  $('#pageTitle').textContent = title;
+  const [,copy] = views[appState.view];
+  $('#pageTitle').textContent = '台股研究台';
   $('.hero .lede').textContent = copy;
-  document.title = `${title} · 臺股研究台`;
-  $('.hero .eyebrow').textContent='臺股盤後研究 · 十個交易日觀察期';
-  $('#snapshotCard').hidden = false;
+  document.title = '台股研究台';
+  $('.hero .eyebrow').textContent=appState.view==='intraday'?'盤中市場觀察':appState.view==='social'?'公開討論觀察':'台股盤後研究';
+  $('#snapshotCard').hidden = ['intraday','social'].includes(appState.view);
   $$('[data-view]').forEach(el => { el.hidden = el.dataset.view !== appState.view; });
   $$('[data-view-link]').forEach(el => {
     if (el.dataset.viewLink === appState.view) el.setAttribute('aria-current', 'page');
@@ -805,8 +807,17 @@ function renderView() {
   });
   renderExplorer();
   renderRankingGroup();
-  if (appState.view !== 'today') ensureCatalog();
-  if (appState.view === 'rankings'&&appState.rankGroup === 'social'&&!appState.job?.running) $('#jobPanel').hidden=true;
+  if (appState.view === 'intraday') loadIntradayView();
+  if (['home','rankings','social'].includes(appState.view)) ensureCatalog();
+  if (appState.view === 'social') loadSocialView();
+  if (['intraday','social'].includes(appState.view)&&!appState.job?.running) $('#jobPanel').hidden=true;
+}
+
+let intradayViewPromise;
+async function loadIntradayView(){
+  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>createIntradayView($('#intradayContent')));
+  try{await intradayViewPromise;}
+  catch{$('#intradayContent').textContent='盤中排行頁面載入失敗，請重新整理。';intradayViewPromise=null;}
 }
 
 let institutionViewPromise;
@@ -821,11 +832,9 @@ function renderRankingGroup() {
   const group=appState.rankGroup;
   $('#marketRankingPanel').hidden=group!=='market';
   $('#institutionRankingPanel').hidden=group!=='institution';
-  $('#socialView').hidden=group!=='social';
   $$('#rankingGroupNav [data-ranking-group]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.rankingGroup===group)));
   if(appState.view!=='rankings')return;
   if(group==='institution')loadInstitutionView();
-  if(group==='social')loadSocialView();
 }
 
 let socialViewPromise;
@@ -951,7 +960,7 @@ function bindEvents() {
   window.addEventListener('hashchange', renderView);
   $('#rankingGroupNav').addEventListener('click',event=>{
     const group=event.target.closest('[data-ranking-group]')?.dataset.rankingGroup;
-    if(group)location.hash=({market:'rankings',institution:'rankings-institution',social:'social'})[group];
+    if(group)location.hash=({market:'rankings',institution:'rankings-institution'})[group];
   });
   $('#stockSearch').addEventListener('input', event => {
     appState.homeQuery = event.target.value; appState.homePage = 1; renderExplorer();

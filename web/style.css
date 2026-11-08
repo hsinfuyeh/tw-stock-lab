@@ -729,8 +729,18 @@ th, td, .sample-table th, .sample-table td,
 .institution-controls select { padding: 10px; border: 1px solid var(--line-dark); border-radius: 8px; color: var(--ink); background: var(--white); max-width: 100%; }
 .institution-ranking-panel,.social-ranking-panel { min-width: 0; }
 .institution-table .institution-selected { background: var(--teal-pale); font-weight: 650; }
+.intraday-connection { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 16px 18px; border: 1px solid var(--line-dark); border-radius: 12px; background: var(--paper); color: var(--ink-soft); }
+.intraday-connection strong { color: var(--ink); }
+.intraday-connection span { font-size: 13px; line-height: 1.8; }
+.intraday-meta { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin: 20px 0; }
+.intraday-meta > div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; }
+.intraday-meta small { display: block; color: var(--ink-soft); margin-bottom: 8px; }
+.intraday-meta b { font-size: 17px; }
+.intraday-empty { height: 170px; text-align: center !important; vertical-align: middle !important; color: var(--ink-soft); white-space: normal; }
+.intraday-notice { padding: 14px; border-left: 3px solid var(--teal); background: var(--teal-pale); font-size: 13px; line-height: 1.8; }
+@media(max-width:700px) { .intraday-meta { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; } }
 @media(max-width:700px) {
-  .ranking-group-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .ranking-group-nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
   .ranking-group-nav .button { padding: 10px 6px; min-width: 0; }
   .institution-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
   .institution-controls label { min-width: 0; }

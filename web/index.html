@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#102e3a">
-  <title>臺股研究台</title>
+  <title>台股研究台</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <a class="skip-link" href="#main">跳至研究結果</a>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="臺股研究台首頁">
+    <a class="brand" href="./" aria-label="台股研究台首頁">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span><b>臺股研究台</b><small>TW STOCK LAB</small></span>
+      <span><b>台股研究台</b><small>TW STOCK LAB</small></span>
     </a>
     <nav class="main-nav" aria-label="主要導覽">
       <a href="#home" data-view-link="home">首頁</a>
-      <a href="#today" data-view-link="today">今日名單</a>
+      <a href="#today" data-view-link="today">建議名單</a>
+      <a href="#intraday" data-view-link="intraday">盤中排行</a>
       <a href="#rankings" data-view-link="rankings">其他排行</a>
       <a href="#social" data-view-link="social">社群聲量</a>
-      <a href="#research" data-view-link="research">績效與追蹤</a>
     </nav>
     <div class="header-tools">
       <button class="button button-outline" id="updateButton" type="button" title="重新讀取已發布的盤後報告；不會啟動資料抓取"><span class="button-icon" aria-hidden="true">↻</span><span class="button-label">重新讀取</span></button>
@@ -30,8 +30,8 @@
   <main id="main">
     <section class="hero" aria-labelledby="pageTitle">
       <div class="hero-copy">
-        <p class="eyebrow">臺股盤後研究 · 十個交易日觀察期</p>
-        <h1 id="pageTitle">個股查詢</h1>
+        <p class="eyebrow">台股盤後研究</p>
+        <h1 id="pageTitle">台股研究台</h1>
         <p class="lede">輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。</p>
       </div>
       <div class="report-identity" id="snapshotCard" aria-live="polite">
@@ -79,10 +79,11 @@
     </section>
 
     <section class="workspace" id="todayView" data-view="today" aria-labelledby="twoWeekTitle" hidden>
-      <div class="section-heading"><div><p class="section-kicker">盤後研究結果</p><h2 id="twoWeekTitle">觀察名單</h2></div><strong id="twoWeekCount" class="result-count">—</strong></div>
+      <div class="section-heading"><div><p class="section-kicker">盤後研究結果</p><h2 id="twoWeekTitle">建議名單</h2></div><strong id="twoWeekCount" class="result-count">—</strong></div>
       <p id="twoWeekStatus" class="research-state" aria-live="polite">載入中</p>
       <div class="table-shell" id="twoWeekTable" hidden></div>
       <p id="twoWeekEmpty" hidden>本次報告沒有符合篩選條件的標的。</p>
+      <p><a class="button button-quiet" href="#research">績效與追蹤</a></p>
       <details id="researchMethods" class="method-details">
         <summary>研究方法、到期追蹤與風險說明</summary>
         <div class="method-body">
@@ -93,12 +94,15 @@
         </div>
       </details>
     </section>
+    <section class="workspace rankings-workspace" id="intradayView" data-view="intraday" aria-labelledby="intradayTitle" hidden>
+      <div class="section-heading"><div><p class="section-kicker">盤中市場觀察</p><h2 id="intradayTitle">盤中排行</h2></div><span class="result-count">盤中行情</span></div>
+      <div id="intradayContent" aria-live="polite">正在載入盤中排行頁面…</div>
+    </section>
     <section class="workspace rankings-workspace" id="rankingsView" data-view="rankings" aria-labelledby="marketRankingTitle" hidden>
-      <div class="section-heading"><div><p class="section-kicker">量價・法人・公開討論</p><h2 id="marketRankingTitle">其他排行</h2></div><span class="result-count">三類觀察排行</span></div>
+      <div class="section-heading"><div><p class="section-kicker">盤後量價・法人</p><h2 id="marketRankingTitle">其他排行</h2></div><span class="result-count">兩類盤後排行</span></div>
       <nav id="rankingGroupNav" class="ranking-group-nav" aria-label="排行類別">
         <button class="button" type="button" data-ranking-group="market" aria-pressed="true">量價排行</button>
         <button class="button" type="button" data-ranking-group="institution" aria-pressed="false">法人籌碼</button>
-        <button class="button" type="button" data-ranking-group="social" aria-pressed="false">社群聲量</button>
       </nav>
       <div class="rankings-layout" id="marketRankingPanel">
         <nav id="marketRankNav" class="rank-nav" aria-label="排行分類"></nav>
@@ -111,7 +115,8 @@
         <p id="sourceChecked" class="source-checked" hidden></p>
       </div>
       <section id="institutionRankingPanel" class="institution-ranking-panel" aria-label="法人買超賣超與買賣總量排行" hidden></section>
-    <section id="socialView" class="social-ranking-panel" aria-labelledby="socialTitle" hidden>
+    </section>
+    <section id="socialView" class="workspace social-ranking-panel" data-view="social" aria-labelledby="socialTitle" hidden>
       <div class="section-heading"><div><p class="section-kicker">公開討論觀察</p><h2 id="socialTitle">社群聲量排行</h2></div><button class="button button-primary" data-social-update>立即更新社群</button></div>
       <div class="social-context-desktop"><p class="search-hint">依觀察到的不同主貼文篇數排序。同篇提及同股票只算一次，不含留言及圖片文字；討論多不代表看多。平台搜尋與收集上限造成取樣差異，非全平台完整聲量。</p><div class="social-sources" data-social-status></div></div>
       <details class="social-context-mobile"><summary>來源狀態與取樣說明</summary><p class="search-hint">同篇提及同股票只算一次，不含留言及圖片文字；討論多不代表看多。平台搜尋與收集上限造成取樣差異，非全平台完整聲量。</p><div class="social-sources" data-social-status-mobile></div></details>
@@ -124,7 +129,6 @@
       <div data-social-results></div>
       <div class="pagination" data-social-pager hidden><button class="button button-quiet" data-social-prev>上一頁</button><span data-social-page></span><button class="button button-quiet" data-social-next>下一頁</button></div>
       <section class="social-evidence" data-social-evidence-panel hidden><div class="section-heading"><h3 data-social-evidence-title></h3><button class="button button-quiet" data-social-close>收起依據</button></div><ul data-social-evidence-list></ul></section>
-    </section>
     </section>
     <details class="legacy-research" hidden><summary>展開歷史情境分析（六種曆日期限）</summary>
     <section class="workspace" aria-labelledby="rankingTitle">
@@ -253,7 +257,7 @@
   </main>
 
   <footer>
-    <p>臺股研究台 <span>／</span> 盤後研究工具</p>
+    <p>台股研究台 <span>／</span> 盤後研究工具</p>
     <p>短期目標僅計未還原價格變動 · 每日盤後更新 · 不提供下單功能</p>
   </footer>
 
