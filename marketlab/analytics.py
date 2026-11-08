@@ -132,14 +132,14 @@ def net_return(entry, close, settings):
     return (proceeds/cost-1)*100
 
 
-def event_outcome(rows, i, horizon, settings, calendar):
+def event_outcome(rows, i, horizon, settings, calendar, *, dates=None):
     if i+1 >= len(rows):
         return None
     entry_day = target_date(rows[i]["date"],1,calendar)
     end_day = target_date(rows[i]["date"],horizon,calendar)
     if not entry_day or not end_day or end_day > rows[-1]["date"]:
         return None
-    dates = [r["date"] for r in rows]
+    if dates is None: dates = [r["date"] for r in rows]
     a,b = bisect_left(dates,entry_day), bisect_left(dates,end_day)
     if a>=len(rows) or b>=len(rows) or dates[a]!=entry_day or dates[b]!=end_day or a>b:
         return None
@@ -160,8 +160,10 @@ class ResearchModel:
     """Precompute labels; select only labels matured at each prediction cutoff."""
     def __init__(self,rows,settings,calendar):
         self.rows,self.settings,self.calendar=rows,settings,calendar
+        self._dates=[r['date'] for r in rows]
         self.features=[features_at(rows,i,calendar) for i in range(len(rows))]
-        self.outcomes={h:[event_outcome(rows,i,h,settings,calendar) for i in range(len(rows))] for h in HORIZONS}
+        self._vectors=np.array([f['vector'] if f else [0.]*6 for f in self.features],dtype=float)
+        self.outcomes={h:[event_outcome(rows,i,h,settings,calendar,dates=self._dates) for i in range(len(rows))] for h in HORIZONS}
 
     def estimate(self,i,horizon):
         rows,settings,calendar=self.rows,self.settings,self.calendar
@@ -178,9 +180,9 @@ class ResearchModel:
         if not indices:
             result["reasons"]=["沒有已成熟且價格可比較的歷史樣本"]
             return result
-        vectors=np.array([self.features[j]["vector"] for j in indices])
+        vectors=self._vectors[indices]
         scale=np.maximum(np.std(vectors,axis=0),np.array([.003,.01,.02,.01,.2,.003]))
-        distances=np.sum(((vectors-np.array(current["vector"]))/scale)**2,axis=1)
+        distances=np.sum(((vectors-self._vectors[i])/scale)**2,axis=1)
         order=np.argsort(distances,kind="stable")[:int(settings.get("neighbors",60))]
         samples=[dict(self.outcomes[horizon][indices[k]],distance=float(distances[k])) for k in order]
         returns=np.array([s["return_pct"] for s in samples])

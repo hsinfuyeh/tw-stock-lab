@@ -270,17 +270,24 @@ class ResearchService:
         key=lambda r:(r["snapshot_id"],r["symbol"],r["horizon"])
         reconciled={key(r):r for r in self.store.get("reconciled",[])}
         pending=[]
+        date_axes={};date_indexes={}
         from itertools import chain
         snapshots=chain((self.store.snapshot(meta['id']) for meta in self.store.history(limit=None)),
                         [extra_snapshot] if extra_snapshot else [])
         for past in snapshots:
             for row in past["rows"]:
                 bars=bundles.get(row["symbol"],{}).get("rows",[])
-                i=next((i for i,r in enumerate(bars) if r["date"]==past["as_of"]),None)
+                symbol=row['symbol']
+                if symbol not in date_axes:
+                    date_axes[symbol]=[r['date'] for r in bars]
+                    positions={}
+                    for index,day in enumerate(date_axes[symbol]): positions.setdefault(day,index)
+                    date_indexes[symbol]=positions
+                i=date_indexes[symbol].get(past['as_of'])
                 for h in HORIZONS:
                     identity=dict(snapshot_id=past["id"],symbol=row["symbol"],horizon=h)
                     prediction=row.get("horizons",{}).get(str(h),{})
-                    outcome=event_outcome(bars,i,h,dict(past["settings"],kind=row["kind"]),calendar) if i is not None else None
+                    outcome=event_outcome(bars,i,h,dict(past["settings"],kind=row["kind"]),calendar,dates=date_axes[symbol]) if i is not None else None
                     old=reconciled.get(key(identity))
                     invalidated=(not outcome and old and i is not None and old.get("exit_date")
                                  and bars[-1]["date"]>=old["exit_date"]
