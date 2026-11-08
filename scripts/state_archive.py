@@ -4,15 +4,22 @@ import sys
 import tarfile
 
 
+def pack_state(filename,root=Path('data'),compresslevel=1):
+    """Keep the same restorable evidence; spend less CPU on gzip compression."""
+    root=Path(root)
+    if not root.exists(): return
+    with tarfile.open(filename,'w:gz',compresslevel=compresslevel) as archive:
+        for path in root.rglob('*'):
+            relative=path.relative_to(root)
+            if path.is_file() and not path.is_symlink() and 'snapshots' not in relative.parts and path.name not in ('update.lock','market-bundles.json'):
+                archive.add(path,arcname=(Path('data')/relative).as_posix(),recursive=False)
+
+
 def main():
     command,filename=sys.argv[1:]
     root=Path('data')
     if command=='pack':
-        if not root.exists(): return
-        with tarfile.open(filename,'w:gz') as archive:
-            for path in root.rglob('*'):
-                if path.is_file() and not path.is_symlink() and 'snapshots' not in path.parts and path.name not in ('update.lock','market-bundles.json'):
-                    archive.add(path,arcname=path.as_posix(),recursive=False)
+        pack_state(filename,root)
     elif command=='restore':
         with tarfile.open(filename,'r:gz') as archive:
             for member in archive.getmembers():
