@@ -21,6 +21,9 @@ function Stop-Process { $global:stopped=$true }
 function Get-CimInstance { return [pscustomobject]@{ProcessId=42;ExecutablePath=(Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe');CommandLine=($global:project+' app.py serve 8771 local-research-dev')} }
 '''
         harness+="$global:project='"+str(script.parent).replace("'","''")+"'\n"
+        # The launcher is Windows-specific; its mocked profile must also exist
+        # when PowerShell tests run on the Linux CI runner.
+        harness+="$env:USERPROFILE=$global:project\n"
         if scenario=='denied':harness+="function Get-NetTCPConnection { [CmdletBinding()]param([string]$State,[int]$LocalPort) Write-Error 'query denied' }\n"
         elif scenario=='different-owner':harness+="function Get-NetTCPConnection { return [pscustomobject]@{OwningProcess=43;LocalPort=8771} }\n"
         elif scenario=='owned-stop':
