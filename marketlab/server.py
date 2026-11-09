@@ -3,6 +3,7 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
 from os import getenv
 from pathlib import Path
+from threading import Lock
 from urllib.parse import urlparse,parse_qs
 from .data import json_text
 
@@ -14,12 +15,13 @@ def make_server(service,port=8765):
     from .official_jobs import OfficialJobs
     official_jobs=OfficialJobs(service)
     from .intraday import IntradayFeed
-    from .mis_intraday import mis_feed
+    from .mis_intraday import mis_feed, watchlist_symbols
     def intraday_universe():
         return service.store.get('universe',[])
-    mis_symbols=getenv('TWSE_MIS_SYMBOLS')
-    intraday_feed=(mis_feed(mis_symbols,intraday_universe) if mis_symbols else
-                   IntradayFeed(getenv('FUGLE_API_KEY'),intraday_universe))
+    fugle_feed=IntradayFeed(getenv('FUGLE_API_KEY'),intraday_universe)
+    mis_setting=service.store.get('mis_watchlist',getenv('TWSE_MIS_SYMBOLS')) or ''
+    feed_state=(watchlist_symbols(mis_setting),mis_feed(mis_setting,intraday_universe)) if mis_setting else ((),fugle_feed)
+    settings_lock=Lock()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def send(self,status,payload,content_type="application/json; charset=utf-8"):
@@ -40,8 +42,9 @@ def make_server(service,port=8765):
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
                 if request.path=="/api/intraday":
-                    report=intraday_feed.report()
-                    return self.send(200,dict(report,scope='watchlist') if mis_symbols else report)
+                    symbols,feed=feed_state
+                    report=feed.report()
+                    return self.send(200,dict(report,scope='watchlist',symbols=list(symbols)) if symbols else report)
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
                 if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})
@@ -75,6 +78,7 @@ def make_server(service,port=8765):
             except (ValueError,TypeError) as exc: return self.send(400,{"error":str(exc)})
             except Exception as exc: return self.send(500,{"error":str(exc)})
         def do_POST(self):
+            nonlocal feed_state
             if not self.allowed_host(): return self.send(403,{"error":"只接受本機主機名稱"})
             origin=self.headers.get("Origin")
             if origin and origin not in (f"http://127.0.0.1:{self.server.server_port}",f"http://localhost:{self.server.server_port}"):
@@ -85,6 +89,22 @@ def make_server(service,port=8765):
                 length=int(self.headers.get("Content-Length","0"))
                 if not 0<length<=16384: raise ValueError("請求內容大小錯誤")
                 body=json.loads(self.rfile.read(length))
+                if self.path=="/api/intraday/watchlist":
+                    if not isinstance(body,dict) or set(body)!={'symbols'} or not isinstance(body['symbols'],str):
+                        raise ValueError('請輸入以空格或逗號分隔的上市證券代號')
+                    raw=body['symbols'].strip()
+                    symbols=watchlist_symbols(raw) if raw else ()
+                    known={item['symbol'] for item in intraday_universe()
+                           if item.get('kind') in ('stock','etf')}
+                    unknown=[symbol for symbol in symbols if symbol not in known]
+                    if known and unknown:
+                        raise ValueError('本機上市清單找不到：'+ '、'.join(unknown))
+                    setting=','.join(symbols)
+                    with settings_lock:
+                        service.store.put('mis_watchlist',setting)
+                        if symbols!=feed_state[0]:
+                            feed_state=(symbols,mis_feed(setting,intraday_universe) if symbols else fugle_feed)
+                    return self.send(200,{'symbols':list(symbols)})
                 if self.path=="/api/official/update":
                     if not isinstance(body,dict) or body: raise ValueError('官方資料更新只接受空 JSON 物件')
                     return self.send(202,{'job':official_jobs.start()})

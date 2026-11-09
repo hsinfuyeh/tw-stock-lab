@@ -84,9 +84,12 @@ export function intradayMarkup(selected='gainers',report={}){
       </div></div>`;
 }
 
-export function createIntradayView(root,fetchReport){
+export function createIntradayView(root,fetchReport,watchlist){
   let selected='gainers';
   let report, timer, generation=0, active=false;
+  let initialized=false;
+  const form=watchlist?.form;
+  const input=form?.querySelector('#intradaySymbols');
   const render=(focus=false)=>{
     const scrollLeft=root.querySelector?.('.rank-nav')?.scrollLeft??0;
     const tableScroll=root.querySelector?.('.research-table-wrap')?.scrollLeft??0;
@@ -104,6 +107,10 @@ export function createIntradayView(root,fetchReport){
       catch{next={status:'unavailable'};}
       if(run!==generation)return;
       report=next;
+      if(input&&!initialized&&next.status!=='unavailable'){
+        if(!input.value)input.value=next.symbols?.join(', ')||'';
+        initialized=true;
+      }
       render(Boolean(root.contains(document.activeElement)));
     }
     if(run===generation&&report?.status!=='unconfigured'){
@@ -120,6 +127,33 @@ export function createIntradayView(root,fetchReport){
       report=undefined;
       render();
     }
+  }
+  if(form){
+    form.hidden=false;
+    const button=form.querySelector('button[type="submit"]');
+    const message=form.querySelector('#intradayWatchlistMessage');
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      button.disabled=true;
+      message.textContent='';
+      try{
+        const {symbols}=await watchlist.save(input.value);
+        input.value=symbols.join(', ');
+        initialized=true;
+        message.textContent=symbols.length?`已儲存 ${symbols.length} 檔自選標的。`:'已關閉 MIS 自選行情。';
+        clearTimeout(timer);
+        report=undefined;
+        generation++;
+        if(active){
+          render();
+          refresh(generation);
+        }
+      }catch(error){
+        message.textContent=error.message||'無法儲存清單，請再試一次。';
+      }finally{
+        button.disabled=false;
+      }
+    });
   }
   root.addEventListener('click',event=>{
     const key=event.target.closest('[data-intraday-rank]')?.dataset.intradayRank;

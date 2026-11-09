@@ -815,8 +815,16 @@ function renderView() {
 
 let intradayViewPromise;
 async function syncIntradayView(){
-  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>
-    createIntradayView($('#intradayContent'),STATIC_MODE?undefined:()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(9000)})));
+  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>{
+    const root=$('#intradayContent');
+    if(STATIC_MODE)return createIntradayView(root);
+    const form=$('#intradayWatchlist');
+    return createIntradayView(root,()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(9000)}),{
+      form, save:symbols=>fetchJSON('/api/intraday/watchlist',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols}),
+      }),
+    });
+  });
   try{(await intradayViewPromise).setActive(appState.view==='intraday');}
   catch{$('#intradayContent').textContent='盤中排行頁面載入失敗，請重新整理。';intradayViewPromise=null;}
 }

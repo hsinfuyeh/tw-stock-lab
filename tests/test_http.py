@@ -46,6 +46,27 @@ class HttpTests(unittest.TestCase):
                 self.assertEqual(json.load(response),report)
                 self.assertEqual(response.headers['Cache-Control'],'no-store')
         feed.assert_called_once_with()
+
+    def test_mis_watchlist_can_be_saved_and_read_without_starting_an_update(self):
+        from unittest.mock import patch
+
+        def save(symbols):
+            return urlopen(Request(self.base+'/api/intraday/watchlist',
+                json.dumps({'symbols': symbols}).encode(), {'Content-Type': 'application/json'}))
+
+        with patch('marketlab.intraday.IntradayFeed.report',
+                   return_value={'status': 'outside_session', 'rows': []}) as feed:
+            with save('2330, 0050 2330') as response:
+                self.assertEqual(json.load(response), {'symbols': ['2330', '0050']})
+            feed.assert_not_called()
+            with urlopen(self.base+'/api/intraday') as response:
+                payload = json.load(response)
+            self.assertEqual(payload['scope'], 'watchlist')
+            self.assertEqual(payload['symbols'], ['2330', '0050'])
+            with self.assertRaises(HTTPError) as error:
+                save('https://example.com')
+            self.assertEqual(error.exception.code, 400)
+            self.assertEqual(self.service.store.get('mis_watchlist'), '2330,0050')
     def test_settings_persist_and_bad_values_do_not_overwrite(self):
         params=dict(DEFAULT_SETTINGS,min_probability=.6)
         req=Request(self.base+"/api/settings",json.dumps(params).encode(),{"Content-Type":"application/json"})

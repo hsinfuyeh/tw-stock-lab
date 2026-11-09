@@ -96,6 +96,13 @@
     </section>
     <section class="workspace rankings-workspace" id="intradayView" data-view="intraday" aria-labelledby="intradayTitle" hidden>
       <div class="section-heading"><div><p class="section-kicker">盤中市場觀察</p><h2 id="intradayTitle">盤中排行</h2></div><span class="result-count">盤中行情</span></div>
+      <form id="intradayWatchlist" class="intraday-connection" hidden>
+        <label for="intradaySymbols"><strong>證交所 MIS 自選清單</strong></label>
+        <input id="intradaySymbols" type="text" maxlength="180" placeholder="2330, 0050" autocomplete="off" aria-describedby="intradayWatchlistHint">
+        <button type="submit" class="button button-quiet">儲存自選清單</button>
+        <small id="intradayWatchlistHint">輸入最多 20 檔上市股票或股票型原型 ETF。以空格或逗號分隔，留空儲存可關閉自選行情。</small>
+        <span id="intradayWatchlistMessage" role="status"></span>
+      </form>
       <div id="intradayContent" aria-live="polite">正在載入盤中排行頁面…</div>
     </section>
     <section class="workspace rankings-workspace" id="rankingsView" data-view="rankings" aria-labelledby="marketRankingTitle" hidden>
