@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 
-from marketlab.mis_intraday import normalize_mis
+from marketlab.mis_intraday import fetch_batches, market_catalog, normalize_mis, watchlist_symbols
 
 
 class MisTests(unittest.TestCase):
@@ -38,3 +38,30 @@ class MisTests(unittest.TestCase):
         report = normalize_mis(dict(rtcode='0000', msgArray=[row]), self.catalog, self.current)
         self.assertEqual(report['status'], 'stale')
         self.assertEqual(report['rows'], [])
+
+    def test_market_catalog_includes_other_listed_etf_types(self):
+        companies = [{'公司代號': '2330', '公司簡稱': '台積電'},
+                     {'公司代號': '9999', '公司簡稱': '測試-DR'}]
+        etfs = {'status': 'success', 'data': [
+            {'stockNo': '0050'}, {'stockNo': '00775B'}, {'stockNo': '00631L'},
+            {'stockNo': '00632R'}, {'stockNo': '00400A'},
+        ]}
+        catalog = market_catalog(companies, etfs)
+        self.assertEqual({row['symbol']: row['kind'] for row in catalog}, {
+            '2330': 'stock', '0050': 'etf', '00775B': 'etf',
+            '00631L': 'etf', '00632R': 'etf', '00400A': 'etf',
+        })
+
+    def test_batches_cover_more_than_one_page_and_report_partial_failure(self):
+        symbols = watchlist_symbols(','.join(str(n) for n in range(1000, 1120)))
+        seen = []
+
+        def fetch(batch):
+            seen.extend(batch)
+            if batch[0] == '1050':
+                raise OSError('transient')
+            return {'rtcode': '0000', 'msgArray': [{'c': symbol} for symbol in batch]}
+
+        report = fetch_batches(symbols, fetch=fetch, pause=lambda _: None)
+        self.assertEqual(seen, list(symbols))
+        self.assertEqual((report['batch_count'], report['batches_ok'], len(report['msgArray'])), (3, 2, 70))

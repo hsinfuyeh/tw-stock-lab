@@ -66,3 +66,18 @@ test('live ranking separates ETFs, filters losers and escapes source text',async
   assert.doesNotMatch(markup,/2330|0056|行情來源尚未連線/);
   assert.doesNotMatch(intradayMarkup('watchlist',report),/0050|2330/);
 });
+
+test('market rankings show results beyond the first 50 and identify partial batches',async()=>{
+  const {intradayMarkup}=await import('../web/intraday.js');
+  const rows=Array.from({length:53},(_,index)=>({
+    symbol:String(2000+index),name:'測試',kind:'stock',day_pct:53-index,
+  }));
+  const report={status:'live',scope:'market',rows,batch_count:3,batches_ok:2,
+    coverage:53,universe_count:120,returned_count:80};
+  const page=intradayMarkup('gainers',report,2);
+  assert.match(page,/第 2／2 頁/);
+  assert.match(page,/2052/);
+  assert.doesNotMatch(page,/>2000 測試/);
+  assert.match(page,/部分批次/);
+  assert.match(page,/來源回傳 80 檔/);
+});

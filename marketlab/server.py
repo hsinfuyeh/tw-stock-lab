@@ -15,12 +15,19 @@ def make_server(service,port=8765):
     from .official_jobs import OfficialJobs
     official_jobs=OfficialJobs(service)
     from .intraday import IntradayFeed
-    from .mis_intraday import mis_feed, watchlist_symbols
+    from .mis_intraday import market_feed, mis_feed, watchlist_symbols
     def intraday_universe():
         return service.store.get('universe',[])
     fugle_feed=IntradayFeed(getenv('FUGLE_API_KEY'),intraday_universe)
     mis_setting=service.store.get('mis_watchlist',getenv('TWSE_MIS_SYMBOLS')) or ''
-    feed_state=(watchlist_symbols(mis_setting),mis_feed(mis_setting,intraday_universe)) if mis_setting else ((),fugle_feed)
+    def configured_feed(setting):
+        if setting=='market':
+            return ('market',(),market_feed())
+        if setting:
+            return ('watchlist',watchlist_symbols(setting),mis_feed(setting,intraday_universe))
+        return (None,(),fugle_feed)
+
+    feed_state=configured_feed(mis_setting)
     settings_lock=Lock()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
@@ -42,9 +49,9 @@ def make_server(service,port=8765):
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
                 if request.path=="/api/intraday":
-                    symbols,feed=feed_state
+                    scope,symbols,feed=feed_state
                     report=feed.report()
-                    return self.send(200,dict(report,scope='watchlist',symbols=list(symbols)) if symbols else report)
+                    return self.send(200,dict(report,scope=scope,symbols=list(symbols)) if scope else report)
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
                 if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})
@@ -90,6 +97,12 @@ def make_server(service,port=8765):
                 if not 0<length<=16384: raise ValueError("請求內容大小錯誤")
                 body=json.loads(self.rfile.read(length))
                 if self.path=="/api/intraday/watchlist":
+                    if body=={'mode':'market'}:
+                        with settings_lock:
+                            service.store.put('mis_watchlist','market')
+                            if feed_state[0]!='market':
+                                feed_state=configured_feed('market')
+                        return self.send(200,{'mode':'market','symbols':[]})
                     if not isinstance(body,dict) or set(body)!={'symbols'} or not isinstance(body['symbols'],str):
                         raise ValueError('請輸入以空格或逗號分隔的上市證券代號')
                     raw=body['symbols'].strip()
@@ -102,8 +115,8 @@ def make_server(service,port=8765):
                     setting=','.join(symbols)
                     with settings_lock:
                         service.store.put('mis_watchlist',setting)
-                        if symbols!=feed_state[0]:
-                            feed_state=(symbols,mis_feed(setting,intraday_universe) if symbols else fugle_feed)
+                        if symbols!=feed_state[1] or feed_state[0]=='market':
+                            feed_state=configured_feed(setting)
                     return self.send(200,{'symbols':list(symbols)})
                 if self.path=="/api/official/update":
                     if not isinstance(body,dict) or body: raise ValueError('官方資料更新只接受空 JSON 物件')

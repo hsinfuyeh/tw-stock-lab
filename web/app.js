@@ -819,9 +819,9 @@ async function syncIntradayView(){
     const root=$('#intradayContent');
     if(STATIC_MODE)return createIntradayView(root);
     const form=$('#intradayWatchlist');
-    return createIntradayView(root,()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(9000)}),{
-      form, save:symbols=>fetchJSON('/api/intraday/watchlist',{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols}),
+    return createIntradayView(root,()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(56000)}),{
+      form, save:settings=>fetchJSON('/api/intraday/watchlist',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings),
       }),
     });
   });

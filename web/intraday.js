@@ -49,43 +49,52 @@ function rankedRows(key,rows){
     .sort((left,right)=>(right[metric]-left[metric])*direction||left.symbol.localeCompare(right.symbol));
 }
 
-export function intradayMarkup(selected='gainers',report={}){
+export function intradayMarkup(selected='gainers',report={},page=1){
   const key=Object.hasOwn(INTRADAY_RANKS,selected)?selected:'gainers',rank=INTRADAY_RANKS[key];
   const status=report.status||'unconfigured';
   const [label,note]=Object.hasOwn(statusText,status)?statusText[status]:statusText.unavailable;
   const usable=status==='live'||status==='closed';
   const watchlist=report.scope==='watchlist';
+  const market=report.scope==='market';
+  const mis=watchlist||market;
+  const partial=Number.isFinite(report.batch_count)&&report.batches_ok<report.batch_count;
   const rows=rankedRows(key,usable?report.rows||[]:[]);
+  const pageCount=Math.max(1,Math.ceil(rows.length/50));
+  const currentPage=Math.min(pageCount,page);
+  const offset=(currentPage-1)*50;
   const columns=key==='opening'?['標的','開盤價','開盤變化','開盤後漲跌幅','行情時間']:
     key==='watchlist'?['標的','觀察條件','入選理由','風險提示','訊號時間']:
     ['排序','標的','成交價','當日漲跌幅','開盤變化','開盤後漲跌幅','成交量（張）','成交金額（元）','行情時間'];
   const count=sign=>rows.filter(row=>Math.sign(row.gap_pct)===sign).length;
   const openingSummary=key==='opening'&&rows.length?
     `開高 ${count(1)} 檔 · 開低 ${count(-1)} 檔 · 平盤 ${count(0)} 檔。依開盤變化絕對值排序。`:'';
-  const rowMarkup=rows.slice(0,50).map((row,index)=>{
+  const rowMarkup=rows.slice(offset,offset+50).map((row,index)=>{
     const security=`${escapeHtml(row.symbol)} ${escapeHtml(row.name)}${row.trial?' · 試撮中':''}`;
     const data=key==='opening'?[security,number(row.opening),percent(row.gap_pct),percent(row.from_open_pct),quoteTime(row.updated_at)]:
-      [index+1,security,number(row.price),percent(row.day_pct),percent(row.gap_pct),
+      [offset+index+1,security,number(row.price),percent(row.day_pct),percent(row.gap_pct),
         percent(row.from_open_pct),number(row.volume),number(row.amount),quoteTime(row.updated_at)];
     return `<tr>${data.map(value=>`<td>${value}</td>`).join('')}</tr>`;
   }).join('');
   let empty=usable?'本分類目前沒有符合條件的成交資料。':'等待可用的盤中行情。';
   if(key==='watchlist')empty='等待盤中資料及策略驗證後顯示觀察名單。';
-  if(watchlist&&key==='amount')empty='此來源未提供累計成交金額。';
+  if(mis&&key==='amount')empty='此來源未提供累計成交金額。';
+  const pagination=pageCount>1?`<div class="intraday-pages"><button type="button" class="button button-quiet" data-intraday-page="previous" ${currentPage===1?'disabled':''}>上一頁</button><span>第 ${currentPage}／${pageCount} 頁</span><button type="button" class="button button-quiet" data-intraday-page="next" ${currentPage===pageCount?'disabled':''}>下一頁</button></div>`:'';
   return `<div class="intraday-connection" role="status"><strong>${label}</strong><span>${note}</span></div>
-    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>${watchlist?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
+    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>${mis?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
     <div class="rankings-layout"><nav class="rank-nav" aria-label="盤中排行分類">${Object.entries(INTRADAY_RANKS).map(([id,r])=>`<button type="button" data-intraday-rank="${id}" aria-pressed="${id===key}">${r.label}</button>`).join('')}</nav>
       <div class="rank-content"><h3>${rank.label}</h3><p class="search-hint">${rank.note}</p>
-        ${usable?`<p class="explore-summary">${watchlist?'自選清單 · ':''}有成交資料 ${number(report.coverage)}／${number(report.universe_count)} 檔 · 本分類 ${rows.length} 檔，最多顯示前 50 檔。</p>`:''}
+        ${Number.isFinite(report.universe_count)?`<p class="explore-summary">${watchlist?'自選清單 · ':market?'上市全市場 · ':''}名錄 ${number(report.universe_count)} 檔${Number.isFinite(report.returned_count)?` · 來源回傳 ${number(report.returned_count)} 檔`:''}${usable?` · 有成交資料 ${number(report.coverage)} 檔 · 本分類 ${rows.length} 檔`:''}。</p>`:''}
+        ${partial?`<p class="intraday-notice">只取得部分批次（${number(report.batches_ok)}／${number(report.batch_count)}）。排行依本次成功取得的行情計算。</p>`:''}
         ${openingSummary?`<p class="explore-summary">${openingSummary}</p>`:''}
         ${key==='watchlist'?'<p class="intraday-notice">盤中策略尚未啟用，目前不產生買進建議或入場名單。</p>':''}
         <div class="research-table-wrap"><table class="research-table intraday-table"><thead><tr>${columns.map(c=>`<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rowMarkup||`<tr><td colspan="${columns.length}" class="intraday-empty">${empty}</td></tr>`}</tbody></table></div>
-        <p class="ranking-footnote">${watchlist?'排名限自選清單。漲跌幅以 MIS 回傳的昨收欄位計算，請核對除權息日的參考價。行情時間依各標的回傳時間。':'涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。'}</p>
+        ${pagination}
+        <p class="ranking-footnote">${mis?`${market?'範圍為上市普通股與上市 ETF。':'排名限自選清單。'}漲跌幅以 MIS 回傳的昨收欄位計算，請核對除權息日的參考價。行情時間依各標的回傳時間。`:'涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。'}</p>
       </div></div>`;
 }
 
 export function createIntradayView(root,fetchReport,watchlist){
-  let selected='gainers';
+  let selected='gainers',page=1;
   let report, timer, generation=0, active=false;
   let initialized=false;
   const form=watchlist?.form;
@@ -93,7 +102,10 @@ export function createIntradayView(root,fetchReport,watchlist){
   const render=(focus=false)=>{
     const scrollLeft=root.querySelector?.('.rank-nav')?.scrollLeft??0;
     const tableScroll=root.querySelector?.('.research-table-wrap')?.scrollLeft??0;
-    root.innerHTML=intradayMarkup(selected,report);
+    if(report?.rows){
+      page=Math.min(page,Math.max(1,Math.ceil(rankedRows(selected,report.rows).length/50)));
+    }
+    root.innerHTML=intradayMarkup(selected,report,page);
     const nav=root.querySelector?.('.rank-nav');
     const table=root.querySelector?.('.research-table-wrap');
     if(nav)nav.scrollLeft=scrollLeft;
@@ -130,19 +142,22 @@ export function createIntradayView(root,fetchReport,watchlist){
   }
   if(form){
     form.hidden=false;
-    const button=form.querySelector('button[type="submit"]');
+    const buttons=[...form.querySelectorAll('button[type="submit"]')];
     const message=form.querySelector('#intradayWatchlistMessage');
     form.addEventListener('submit',async event=>{
       event.preventDefault();
-      button.disabled=true;
+      for(const button of buttons)button.disabled=true;
       message.textContent='';
       try{
-        const {symbols}=await watchlist.save(input.value);
+        const request=event.submitter?.value==='market'?{mode:'market'}:{symbols:input.value};
+        const {symbols,mode}=await watchlist.save(request);
         input.value=symbols.join(', ');
         initialized=true;
-        message.textContent=symbols.length?`已儲存 ${symbols.length} 檔自選標的。`:'已關閉 MIS 自選行情。';
+        message.textContent=mode==='market'?'已啟用上市全市場。':
+          symbols.length?`已儲存 ${symbols.length} 檔自選標的。`:'已關閉 MIS 行情。';
         clearTimeout(timer);
         report=undefined;
+        page=1;
         generation++;
         if(active){
           render();
@@ -151,14 +166,22 @@ export function createIntradayView(root,fetchReport,watchlist){
       }catch(error){
         message.textContent=error.message||'無法儲存清單，請再試一次。';
       }finally{
-        button.disabled=false;
+        for(const button of buttons)button.disabled=false;
       }
     });
   }
   root.addEventListener('click',event=>{
+    const direction=event.target.closest('[data-intraday-page]')?.dataset.intradayPage;
+    if(direction==='previous'||direction==='next'){
+      page=Math.max(1,page+(direction==='next'?1:-1));
+      render();
+      root.querySelector(`[data-intraday-page="${direction}"]:not([disabled])`)?.focus({preventScroll:true});
+      return;
+    }
     const key=event.target.closest('[data-intraday-rank]')?.dataset.intradayRank;
     if(!Object.hasOwn(INTRADAY_RANKS,key))return;
     selected=key;
+    page=1;
     render(true);
   });
   render();return {render,setActive};
