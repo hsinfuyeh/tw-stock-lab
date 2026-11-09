@@ -14,7 +14,12 @@ def make_server(service,port=8765):
     from .official_jobs import OfficialJobs
     official_jobs=OfficialJobs(service)
     from .intraday import IntradayFeed
-    intraday_feed=IntradayFeed(getenv('FUGLE_API_KEY'),lambda:service.store.get('universe',[]))
+    from .mis_intraday import mis_feed
+    def intraday_universe():
+        return service.store.get('universe',[])
+    mis_symbols=getenv('TWSE_MIS_SYMBOLS')
+    intraday_feed=(mis_feed(mis_symbols,intraday_universe) if mis_symbols else
+                   IntradayFeed(getenv('FUGLE_API_KEY'),intraday_universe))
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def send(self,status,payload,content_type="application/json; charset=utf-8"):
@@ -34,7 +39,9 @@ def make_server(service,port=8765):
             request=urlparse(self.path); q=parse_qs(request.query)
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
-                if request.path=="/api/intraday": return self.send(200,intraday_feed.report())
+                if request.path=="/api/intraday":
+                    report=intraday_feed.report()
+                    return self.send(200,dict(report,scope='watchlist') if mis_symbols else report)
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
                 if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})

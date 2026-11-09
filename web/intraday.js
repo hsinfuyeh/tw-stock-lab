@@ -15,7 +15,7 @@ export const INTRADAY_RANKS={
 
 const statusText={
   unconfigured:['行情來源尚未連線','尚未接入盤中行情，以下不顯示盤後數據或模擬報價。'],
-  live:['盤中快照','本機頁面開啟時，每 15 秒檢查一次。'],
+  live:['盤中快照','本機頁面開啟時，會定期檢查行情。'],
   closed:['已離開一般交易時段','顯示當日來源快照。'],
   outside_session:['目前不在盤中','開盤時段開始後會查詢。'],
   stale:['行情日期或時間已過期','已暫停顯示排行，等待有效快照。'],
@@ -54,6 +54,7 @@ export function intradayMarkup(selected='gainers',report={}){
   const status=report.status||'unconfigured';
   const [label,note]=Object.hasOwn(statusText,status)?statusText[status]:statusText.unavailable;
   const usable=status==='live'||status==='closed';
+  const watchlist=report.scope==='watchlist';
   const rows=rankedRows(key,usable?report.rows||[]:[]);
   const columns=key==='opening'?['標的','開盤價','開盤變化','開盤後漲跌幅','行情時間']:
     key==='watchlist'?['標的','觀察條件','入選理由','風險提示','訊號時間']:
@@ -68,17 +69,18 @@ export function intradayMarkup(selected='gainers',report={}){
         percent(row.from_open_pct),number(row.volume),number(row.amount),quoteTime(row.updated_at)];
     return `<tr>${data.map(value=>`<td>${value}</td>`).join('')}</tr>`;
   }).join('');
-  const empty=key==='watchlist'?'等待盤中資料及策略驗證後顯示觀察名單。':
-    usable?'本分類目前沒有符合條件的成交資料。':'等待可用的盤中行情。';
+  let empty=usable?'本分類目前沒有符合條件的成交資料。':'等待可用的盤中行情。';
+  if(key==='watchlist')empty='等待盤中資料及策略驗證後顯示觀察名單。';
+  if(watchlist&&key==='amount')empty='此來源未提供累計成交金額。';
   return `<div class="intraday-connection" role="status"><strong>${label}</strong><span>${note}</span></div>
-    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>快照時間（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
+    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>${watchlist?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
     <div class="rankings-layout"><nav class="rank-nav" aria-label="盤中排行分類">${Object.entries(INTRADAY_RANKS).map(([id,r])=>`<button type="button" data-intraday-rank="${id}" aria-pressed="${id===key}">${r.label}</button>`).join('')}</nav>
       <div class="rank-content"><h3>${rank.label}</h3><p class="search-hint">${rank.note}</p>
-        ${usable?`<p class="explore-summary">有成交資料 ${number(report.coverage)}／${number(report.universe_count)} 檔 · 本分類 ${rows.length} 檔，最多顯示前 50 檔。</p>`:''}
+        ${usable?`<p class="explore-summary">${watchlist?'自選清單 · ':''}有成交資料 ${number(report.coverage)}／${number(report.universe_count)} 檔 · 本分類 ${rows.length} 檔，最多顯示前 50 檔。</p>`:''}
         ${openingSummary?`<p class="explore-summary">${openingSummary}</p>`:''}
         ${key==='watchlist'?'<p class="intraday-notice">盤中策略尚未啟用，目前不產生買進建議或入場名單。</p>':''}
         <div class="research-table-wrap"><table class="research-table intraday-table"><thead><tr>${columns.map(c=>`<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rowMarkup||`<tr><td colspan="${columns.length}" class="intraday-empty">${empty}</td></tr>`}</tbody></table></div>
-        <p class="ranking-footnote">涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。</p>
+        <p class="ranking-footnote">${watchlist?'排名限自選清單。漲跌幅以 MIS 回傳的昨收欄位計算，請核對除權息日的參考價。行情時間依各標的回傳時間。':'涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。'}</p>
       </div></div>`;
 }
 

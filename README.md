@@ -51,6 +51,16 @@ finally { Remove-Item Env:FUGLE_API_KEY; $fugleInput.Dispose() }
 
 開啟 [本機盤中排行](http://127.0.0.1:8771/#intraday)。畫面會顯示來源時間、行情覆蓋與前 50 檔排行。開盤分析顯示開高、開低與平盤家數。固定前 5／15／30 分鐘分析與入場觀察策略需要額外的盤中歷史及驗證。GitHub Pages 版沒有本機行情 API。
 
+免金鑰的本機測試可改用[證交所基本市況報導網站](https://mis.twse.com.tw/stock/index)的自選行情。先停止已啟動的本機研究伺服器，再用 PowerShell 啟動以下範例。清單上限 20 檔，以本機上市普通股與股票型原型 ETF 清單為準。
+
+```powershell
+$env:TWSE_MIS_SYMBOLS = '2330,0050'
+try { ./launch-local-research.ps1 -NoBrowser }
+finally { Remove-Item Env:TWSE_MIS_SYMBOLS }
+```
+
+MIS 是網站查詢介面。盤中頁以自選清單排序，成交金額留空，前一交易日資料不會顯示成當日盤中行情。公開傳輸及加值展示須確認[交易資訊使用授權](https://www.twse.com.tw/zh/products/information/qa.html)。
+
 首次需建立36個月全市場歷史，可能數十分鐘以上。後續只重抓近期行情與母集合，從現有資料增量分析。快取可續跑；另存3天公開資料備份artifact。若快取／備份均遺失則重新下載。初次資料也可由initial-data release恢復；舊seed僅作歷史快取，仍須更新至最新共同交易日。
 
 失敗不發布新站、不把舊價格當作當日資料。停牌、缺資料、新上市歷史不足仍列在母集合並保守排除。網頁最多提供最近3份研究快照；原始研究記錄保留於資料庫與備份。Actions可手動Run workflow重新更新。

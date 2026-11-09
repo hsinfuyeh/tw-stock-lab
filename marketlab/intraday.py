@@ -108,40 +108,44 @@ def normalize_snapshot(payload, universe, current):
 
 
 class IntradayFeed:
-    def __init__(self, key, universe, *, fetch=fetch_snapshot, clock=now, timer=monotonic):
-        self.key = key
+    def __init__(self, configuration, universe, *, fetch=fetch_snapshot, clock=now, timer=monotonic,
+                 normalize=normalize_snapshot, source=SOURCE, live_ttl=15):
+        self.configuration = configuration
         self.universe = universe
         self.fetch = fetch
         self.clock = clock
         self.timer = timer
+        self.normalize = normalize
+        self.source = source
+        self.live_ttl = live_ttl
         self.lock = threading.Lock()
         self.cached = None
         self.valid_until = 0
 
     def report(self):
-        if not self.key:
+        if not self.configuration:
             return empty_report('unconfigured', source=None)
         current = self.clock()
         if current.weekday() >= 5 or current.time() < MARKET_OPEN:
-            return empty_report('outside_session')
+            return empty_report('outside_session', source=self.source)
         with self.lock:
             current = self.clock()
             session = (current.date(), current.time() < MARKET_CLOSE)
             if self.cached and self.cached[0] == session and self.timer() < self.valid_until:
                 return self.cached[1]
             try:
-                payload = self.fetch(self.key)
+                payload = self.fetch(self.configuration)
                 current = self.clock()
-                result = normalize_snapshot(payload, self.universe(), current)
+                result = self.normalize(payload, self.universe(), current)
             except HTTPError as exc:
                 status = {401: 'unauthorized', 403: 'unauthorized', 429: 'rate_limited'}
-                result = empty_report(status.get(exc.code, 'unavailable'))
+                result = empty_report(status.get(exc.code, 'unavailable'), source=self.source)
             except (ValueError, OSError, OverflowError):
-                result = empty_report('unavailable')
+                result = empty_report('unavailable', source=self.source)
             self.cached = ((current.date(), current.time() < MARKET_CLOSE), result)
             ttl = 60
             if result['status'] == 'live':
                 age = (current - datetime.fromisoformat(result['snapshot_at'])).total_seconds()
-                ttl = min(15, 90 - age)
+                ttl = min(self.live_ttl, 90 - age)
             self.valid_until = self.timer() + ttl
             return result
