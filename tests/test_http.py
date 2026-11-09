@@ -38,6 +38,14 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(err.exception.code,400)
         with self.assertRaises(HTTPError) as err: urlopen(self.base+'/api/institutions?id=absent')
         self.assertEqual(err.exception.code,404)
+    def test_intraday_endpoint_returns_feed_status(self):
+        from unittest.mock import patch
+        report = {'status': 'stale', 'rows': []}
+        with patch('marketlab.intraday.IntradayFeed.report', return_value=report) as feed:
+            with urlopen(self.base+'/api/intraday') as response:
+                self.assertEqual(json.load(response),report)
+                self.assertEqual(response.headers['Cache-Control'],'no-store')
+        feed.assert_called_once_with()
     def test_settings_persist_and_bad_values_do_not_overwrite(self):
         params=dict(DEFAULT_SETTINGS,min_probability=.6)
         req=Request(self.base+"/api/settings",json.dumps(params).encode(),{"Content-Type":"application/json"})

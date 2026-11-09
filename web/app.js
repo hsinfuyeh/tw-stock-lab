@@ -807,16 +807,17 @@ function renderView() {
   });
   renderExplorer();
   renderRankingGroup();
-  if (appState.view === 'intraday') loadIntradayView();
+  if (appState.view === 'intraday' || intradayViewPromise) syncIntradayView();
   if (['home','rankings','social'].includes(appState.view)) ensureCatalog();
   if (appState.view === 'social') loadSocialView();
   if (['intraday','social'].includes(appState.view)&&!appState.job?.running) $('#jobPanel').hidden=true;
 }
 
 let intradayViewPromise;
-async function loadIntradayView(){
-  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>createIntradayView($('#intradayContent')));
-  try{await intradayViewPromise;}
+async function syncIntradayView(){
+  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>
+    createIntradayView($('#intradayContent'),STATIC_MODE?undefined:()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(9000)})));
+  try{(await intradayViewPromise).setActive(appState.view==='intraday');}
   catch{$('#intradayContent').textContent='盤中排行頁面載入失敗，請重新整理。';intradayViewPromise=null;}
 }
 

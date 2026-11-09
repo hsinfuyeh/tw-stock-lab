@@ -1,6 +1,7 @@
 """Local-only HTTP service. No trading or external write capability."""
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
+from os import getenv
 from pathlib import Path
 from urllib.parse import urlparse,parse_qs
 from .data import json_text
@@ -12,6 +13,8 @@ def make_server(service,port=8765):
     social_jobs=SocialJobs(service)
     from .official_jobs import OfficialJobs
     official_jobs=OfficialJobs(service)
+    from .intraday import IntradayFeed
+    intraday_feed=IntradayFeed(getenv('FUGLE_API_KEY'),lambda:service.store.get('universe',[]))
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def send(self,status,payload,content_type="application/json; charset=utf-8"):
@@ -31,6 +34,7 @@ def make_server(service,port=8765):
             request=urlparse(self.path); q=parse_qs(request.query)
             try:
                 if request.path=="/api/state": return self.send(200,service.state())
+                if request.path=="/api/intraday": return self.send(200,intraday_feed.report())
                 if request.path=="/api/research": return self.send(200,service.research_report(q.get('id',[None])[0]))
                 if request.path=="/api/official": return self.send(200,official_jobs.report(q.get('symbol',[None])[0],q.get('id',[None])[0]))
                 if request.path=="/api/official/job": return self.send(200,{'job':official_jobs.state()})

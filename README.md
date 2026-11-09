@@ -40,6 +40,17 @@ https://hsinfuyeh.github.io/tw-stock-lab/
 
 GitHub Actions每日台灣19:15啟動（UTC11:15），22:47再補檢一次（UTC14:47），完成後自動發布。相同資料不會重建研究快照。電腦可關機；不是盤中即時報價。GitHub排程可能延遲，公開專案長期無活動也可能停用排程，請以網頁資料日與Actions狀態為準。休市日檢查後保留最近交易日。
 
+本機「盤中排行」支援[富果上市行情快照](https://developer.fugle.tw/docs/data/http-api/snapshot/quotes/)。使用有快照權限的行情 API 金鑰，先完成一次本機市場資料更新，取得上市普通股與股票型原型 ETF 分類。若伺服器已啟動，先執行 `./launch-local-research.ps1 -Stop`，再在 PowerShell 執行以下指令。輸入的金鑰只傳給本機伺服器程序，請勿放入程式碼或 Git。
+
+```powershell
+$fugleInput = Read-Host '富果行情 API 金鑰' -AsSecureString
+$env:FUGLE_API_KEY = [System.Net.NetworkCredential]::new('', $fugleInput).Password
+try { ./launch-local-research.ps1 -NoBrowser }
+finally { Remove-Item Env:FUGLE_API_KEY; $fugleInput.Dispose() }
+```
+
+開啟 [本機盤中排行](http://127.0.0.1:8771/#intraday)。畫面會顯示來源時間、行情覆蓋與前 50 檔排行。開盤分析顯示開高、開低與平盤家數。固定前 5／15／30 分鐘分析與入場觀察策略需要額外的盤中歷史及驗證。GitHub Pages 版沒有本機行情 API。
+
 首次需建立36個月全市場歷史，可能數十分鐘以上。後續只重抓近期行情與母集合，從現有資料增量分析。快取可續跑；另存3天公開資料備份artifact。若快取／備份均遺失則重新下載。初次資料也可由initial-data release恢復；舊seed僅作歷史快取，仍須更新至最新共同交易日。
 
 失敗不發布新站、不把舊價格當作當日資料。停牌、缺資料、新上市歷史不足仍列在母集合並保守排除。網頁最多提供最近3份研究快照；原始研究記錄保留於資料庫與備份。Actions可手動Run workflow重新更新。

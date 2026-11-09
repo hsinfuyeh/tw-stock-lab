@@ -51,3 +51,18 @@ test('category selection preserves keyboard focus and mobile sidebar scroll',asy
   assert.equal(focused,true);assert.equal(nav.scrollLeft,280);
   assert.match(markup,/data-intraday-rank="opening" aria-pressed="true"/);
 });
+
+test('live ranking separates ETFs, filters losers and escapes source text',async()=>{
+  const {intradayMarkup}=await import('../web/intraday.js');
+  const report={status:'live',coverage:3,universe_count:4,snapshot_at:'2026-11-09T09:10:10+08:00',rows:[
+    {symbol:'2330',name:'台積電',kind:'stock',day_pct:-2},
+    {symbol:'0050',name:'<ETF>',kind:'etf',day_pct:-1.2},
+    {symbol:'0056',name:'高股息',kind:'etf',day_pct:1.5}
+  ]};
+  const markup=intradayMarkup('etf-losers',report);
+  assert.match(markup,/0050/);
+  assert.match(markup,/&lt;ETF&gt;/);
+  assert.match(markup,/-1\.20%/);
+  assert.doesNotMatch(markup,/2330|0056|行情來源尚未連線/);
+  assert.doesNotMatch(intradayMarkup('watchlist',report),/0050|2330/);
+});
