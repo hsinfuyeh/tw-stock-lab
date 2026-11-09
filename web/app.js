@@ -817,7 +817,7 @@ let intradayViewPromise;
 async function syncIntradayView(){
   if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>{
     const root=$('#intradayContent');
-    if(STATIC_MODE)return createIntradayView(root);
+    if(STATIC_MODE)return createIntradayView(root,undefined,{staticMode:true});
     const form=$('#intradayWatchlist');
     return createIntradayView(root,()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(56000)}),{
       form, save:settings=>fetchJSON('/api/intraday/watchlist',{

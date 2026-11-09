@@ -81,3 +81,15 @@ test('market rankings show results beyond the first 50 and identify partial batc
   assert.match(page,/部分批次/);
   assert.match(page,/來源回傳 80 檔/);
 });
+
+test('public intraday view provides official and after-hours links when reopened',async()=>{
+  const {createIntradayView}=await import('../web/intraday.js');
+  const root={innerHTML:'',addEventListener(){}};
+  const view=createIntradayView(root,undefined,{staticMode:true});
+  view.setActive(true);
+  view.setActive(false);
+  view.setActive(true);
+  assert.match(root.innerHTML,/href="https:\/\/mis\.twse\.com\.tw\/stock\/index"/);
+  assert.match(root.innerHTML,/href="#rankings"/);
+  assert.match(root.innerHTML,/即時排行目前在本機使用/);
+});

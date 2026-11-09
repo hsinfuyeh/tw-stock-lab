@@ -736,6 +736,7 @@ th, td, .sample-table th, .sample-table td,
 #intradaySymbols { flex: 1; min-width: min(100%, 12rem); }
 #intradayWatchlistHint { flex-basis: 100%; }
 .intraday-pages { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.intraday-connection > .intraday-pages { flex-basis: 100%; flex-wrap: wrap; }
 .intraday-meta { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin: 20px 0; }
 .intraday-meta > div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; }
 .intraday-meta small { display: block; color: var(--ink-soft); margin-bottom: 8px; }

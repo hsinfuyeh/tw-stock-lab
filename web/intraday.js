@@ -15,6 +15,7 @@ export const INTRADAY_RANKS={
 
 const statusText={
   unconfigured:['行情來源尚未連線','尚未接入盤中行情，以下不顯示盤後數據或模擬報價。'],
+  public_site:['公開版行情入口','上市全市場即時排行目前在本機使用。可到證交所網站查詢即時行情，或查看本站已發布的盤後排行。'],
   live:['盤中快照','本機頁面開啟時，會定期檢查行情。'],
   closed:['已離開一般交易時段','顯示當日來源快照。'],
   outside_session:['目前不在盤中','開盤時段開始後會查詢。'],
@@ -79,7 +80,8 @@ export function intradayMarkup(selected='gainers',report={},page=1){
   if(key==='watchlist')empty='等待盤中資料及策略驗證後顯示觀察名單。';
   if(mis&&key==='amount')empty='此來源未提供累計成交金額。';
   const pagination=pageCount>1?`<div class="intraday-pages"><button type="button" class="button button-quiet" data-intraday-page="previous" ${currentPage===1?'disabled':''}>上一頁</button><span>第 ${currentPage}／${pageCount} 頁</span><button type="button" class="button button-quiet" data-intraday-page="next" ${currentPage===pageCount?'disabled':''}>下一頁</button></div>`:'';
-  return `<div class="intraday-connection" role="status"><strong>${label}</strong><span>${note}</span></div>
+  const publicLinks=status==='public_site'?`<div class="intraday-pages"><a class="button button-quiet" href="https://mis.twse.com.tw/stock/index" target="_blank" rel="noopener noreferrer">證交所即時行情</a><a class="button button-quiet" href="#rankings">查看本站盤後排行</a></div>`:'';
+  return `<div class="intraday-connection" role="status"><strong>${label}</strong><span>${note}</span>${publicLinks}</div>
     <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>${mis?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
     <div class="rankings-layout"><nav class="rank-nav" aria-label="盤中排行分類">${Object.entries(INTRADAY_RANKS).map(([id,r])=>`<button type="button" data-intraday-rank="${id}" aria-pressed="${id===key}">${r.label}</button>`).join('')}</nav>
       <div class="rank-content"><h3>${rank.label}</h3><p class="search-hint">${rank.note}</p>
@@ -95,7 +97,8 @@ export function intradayMarkup(selected='gainers',report={},page=1){
 
 export function createIntradayView(root,fetchReport,watchlist){
   let selected='gainers',page=1;
-  let report, timer, generation=0, active=false;
+  let report=watchlist?.staticMode?{status:'public_site'}:undefined;
+  let timer, generation=0, active=false;
   let initialized=false;
   const form=watchlist?.form;
   const input=form?.querySelector('#intradaySymbols');
@@ -135,7 +138,7 @@ export function createIntradayView(root,fetchReport,watchlist){
     generation++;
     clearTimeout(timer);
     if(active&&fetchReport)refresh(generation);
-    if(!active&&report){
+    if(!active&&report&&!watchlist?.staticMode){
       report=undefined;
       render();
     }
