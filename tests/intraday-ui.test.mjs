@@ -91,5 +91,20 @@ test('public intraday view provides official and after-hours links when reopened
   view.setActive(true);
   assert.match(root.innerHTML,/href="https:\/\/mis\.twse\.com\.tw\/stock\/index"/);
   assert.match(root.innerHTML,/href="#rankings"/);
-  assert.match(root.innerHTML,/即時排行目前在本機使用/);
+  assert.match(root.innerHTML,/官方盤後排行/);
+});
+
+test('public rankings use the published session, keep share units and omit intraday-only categories',async()=>{
+  const {intradayMarkup,publishedRankingReport}=await import('../web/intraday.js');
+  const day='2026-11-13';
+  const report=publishedRankingReport({as_of:day,rows:[
+    {symbol:'0050',name:'台灣50',kind:'etf',data_as_of:day,metrics:{close:100,volume:123456,turnover:12345600,change_pct:2}},
+    {symbol:'0056',name:'高股息',kind:'etf',data_as_of:'2026-11-12',metrics:{close:40,change_pct:8}}
+  ]});
+  const html=intradayMarkup('etf-gainers',report);
+  assert.match(html,/2026-11-13/);
+  assert.match(html,/0050/);
+  assert.match(html,/成交量（股）/);
+  assert.match(html,/123,456/);
+  assert.doesNotMatch(html,/0056|入場觀察名單|開盤後漲幅|行情時間/);
 });

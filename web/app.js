@@ -786,7 +786,7 @@ function renderView() {
   const views = {
     home: ['個股查詢', '輸入股票代號或名稱，查看盤後行情、近期走勢與分析資訊。'],
     today: ['建議名單', '依盤後量價排序，追蹤下一交易日進場後十個交易日內的 +5% 價格目標。'],
-    intraday: ['盤中排行', '查看上市股票與 ETF 的盤中漲跌、量價及開盤觀察；行情未連線時會明確標示。'],
+    intraday: ['盤中排行', STATIC_MODE?'查看官方盤後排行，或前往證交所查看盤中即時行情。':'查看上市股票與 ETF 的盤中漲跌、量價及開盤觀察。'],
     rankings: ['其他排行', '查看盤後量價與三大法人買超／賣超、買進／賣出總量排行。'],
     social: ['社群聲量', '觀察公開討論名單、提及篇數與原文依據；各平台資料時間及涵蓋範圍分別標示。'],
     research: ['績效與追蹤', '核對原候選、固定交易規則、成本後結果與資料覆蓋。'],
@@ -815,9 +815,15 @@ function renderView() {
 
 let intradayViewPromise;
 async function syncIntradayView(){
-  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView})=>{
+  if(!intradayViewPromise)intradayViewPromise=import('./intraday.js').then(({createIntradayView,publishedRankingReport})=>{
     const root=$('#intradayContent');
-    if(STATIC_MODE)return createIntradayView(root,undefined,{staticMode:true});
+    if(STATIC_MODE){
+      $('#intradayTitle').textContent='行情與排行';
+      $('#intradayView .section-kicker').textContent='證交所行情';
+      $('#intradayView .result-count').hidden=true;
+      return createIntradayView(root,async()=>publishedRankingReport(
+        await fetchJSON(dataURL(true,'explore'),{signal:AbortSignal.timeout(12000)})),{staticMode:true});
+    }
     const form=$('#intradayWatchlist');
     return createIntradayView(root,()=>fetchJSON('/api/intraday',{signal:AbortSignal.timeout(56000)}),{
       form, save:settings=>fetchJSON('/api/intraday/watchlist',{

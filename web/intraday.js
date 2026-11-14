@@ -15,7 +15,9 @@ export const INTRADAY_RANKS={
 
 const statusText={
   unconfigured:['行情來源尚未連線','尚未接入盤中行情，以下不顯示盤後數據或模擬報價。'],
-  public_site:['公開版行情入口','上市全市場即時排行目前在本機使用。可到證交所網站查詢即時行情，或查看本站已發布的盤後排行。'],
+  public_site:['官方盤後排行','正在讀取本站已發布的交易日資料。'],
+  published:['官方盤後排行','下方顯示最近一次發布的收盤資料。盤中價格請查看證交所即時行情。'],
+  published_error:['官方盤後排行','暫時無法讀取本站已發布的資料。'],
   live:['盤中快照','本機頁面開啟時，會定期檢查行情。'],
   closed:['已離開一般交易時段','顯示當日來源快照。'],
   outside_session:['目前不在盤中','開盤時段開始後會查詢。'],
@@ -40,6 +42,21 @@ const numeric=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:4});
 const number=value=>Number.isFinite(value)?numeric.format(value):'—';
 const percent=value=>Number.isFinite(value)?`${value>0?'+':''}${value.toFixed(2)}%`:'—';
 const quoteTime=value=>escapeHtml(value?.slice(11,19));
+const publishedKeys=['gainers','losers','etf-gainers','etf-losers','amount','volume'];
+
+export function publishedRankingReport(catalog){
+  const date=catalog?.as_of;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Array.isArray(catalog.rows)){
+    throw new Error('無法讀取已發布的盤後資料');
+  }
+  const rows=catalog.rows.filter(row=>row.data_as_of===date&&
+    ['stock','etf'].includes(row.kind)&&Number.isFinite(row.metrics?.close)).map(row=>({
+    symbol:row.symbol,name:row.name,kind:row.kind,price:row.metrics.close,
+    day_pct:row.metrics.change_pct,volume:row.metrics.volume,amount:row.metrics.turnover,
+  }));
+  return {status:'published',scope:'published',source:'臺灣證券交易所 · 盤後成交資料',
+    snapshot_at:date,coverage:rows.length,universe_count:catalog.rows.length,rows};
+}
 
 function rankedRows(key,rows){
   if(key==='opening')return rows.filter(row=>Number.isFinite(row.gap_pct))
@@ -51,10 +68,12 @@ function rankedRows(key,rows){
 }
 
 export function intradayMarkup(selected='gainers',report={},page=1){
-  const key=Object.hasOwn(INTRADAY_RANKS,selected)?selected:'gainers',rank=INTRADAY_RANKS[key];
   const status=report.status||'unconfigured';
+  const publicMode=['public_site','published','published_error'].includes(status);
+  const keys=publicMode?publishedKeys:Object.keys(INTRADAY_RANKS);
+  const key=keys.includes(selected)?selected:'gainers',rank=INTRADAY_RANKS[key];
   const [label,note]=Object.hasOwn(statusText,status)?statusText[status]:statusText.unavailable;
-  const usable=status==='live'||status==='closed';
+  const usable=status==='live'||status==='closed'||status==='published';
   const watchlist=report.scope==='watchlist';
   const market=report.scope==='market';
   const mis=watchlist||market;
@@ -63,7 +82,8 @@ export function intradayMarkup(selected='gainers',report={},page=1){
   const pageCount=Math.max(1,Math.ceil(rows.length/50));
   const currentPage=Math.min(pageCount,page);
   const offset=(currentPage-1)*50;
-  const columns=key==='opening'?['標的','開盤價','開盤變化','開盤後漲跌幅','行情時間']:
+  const columns=publicMode?['排序','標的','收盤價','當日漲跌幅','成交量（股）','成交金額（元）']:
+    key==='opening'?['標的','開盤價','開盤變化','開盤後漲跌幅','行情時間']:
     key==='watchlist'?['標的','觀察條件','入選理由','風險提示','訊號時間']:
     ['排序','標的','成交價','當日漲跌幅','開盤變化','開盤後漲跌幅','成交量（張）','成交金額（元）','行情時間'];
   const count=sign=>rows.filter(row=>Math.sign(row.gap_pct)===sign).length;
@@ -71,27 +91,29 @@ export function intradayMarkup(selected='gainers',report={},page=1){
     `開高 ${count(1)} 檔 · 開低 ${count(-1)} 檔 · 平盤 ${count(0)} 檔。依開盤變化絕對值排序。`:'';
   const rowMarkup=rows.slice(offset,offset+50).map((row,index)=>{
     const security=`${escapeHtml(row.symbol)} ${escapeHtml(row.name)}${row.trial?' · 試撮中':''}`;
-    const data=key==='opening'?[security,number(row.opening),percent(row.gap_pct),percent(row.from_open_pct),quoteTime(row.updated_at)]:
+    const data=publicMode?[offset+index+1,security,number(row.price),percent(row.day_pct),number(row.volume),number(row.amount)]:
+      key==='opening'?[security,number(row.opening),percent(row.gap_pct),percent(row.from_open_pct),quoteTime(row.updated_at)]:
       [offset+index+1,security,number(row.price),percent(row.day_pct),percent(row.gap_pct),
         percent(row.from_open_pct),number(row.volume),number(row.amount),quoteTime(row.updated_at)];
     return `<tr>${data.map(value=>`<td>${value}</td>`).join('')}</tr>`;
   }).join('');
-  let empty=usable?'本分類目前沒有符合條件的成交資料。':'等待可用的盤中行情。';
+  let empty=usable?'本分類目前沒有符合條件的成交資料。':publicMode?note:'等待可用的盤中行情。';
   if(key==='watchlist')empty='等待盤中資料及策略驗證後顯示觀察名單。';
   if(mis&&key==='amount')empty='此來源未提供累計成交金額。';
   const pagination=pageCount>1?`<div class="intraday-pages"><button type="button" class="button button-quiet" data-intraday-page="previous" ${currentPage===1?'disabled':''}>上一頁</button><span>第 ${currentPage}／${pageCount} 頁</span><button type="button" class="button button-quiet" data-intraday-page="next" ${currentPage===pageCount?'disabled':''}>下一頁</button></div>`:'';
-  const publicLinks=status==='public_site'?`<div class="intraday-pages"><a class="button button-quiet" href="https://mis.twse.com.tw/stock/index" target="_blank" rel="noopener noreferrer">證交所即時行情</a><a class="button button-quiet" href="#rankings">查看本站盤後排行</a></div>`:'';
+  const publicLinks=publicMode?`<div class="intraday-pages"><a class="button button-quiet" href="https://mis.twse.com.tw/stock/index" target="_blank" rel="noopener noreferrer">證交所即時行情</a><a class="button button-quiet" href="#rankings">更多盤後排行</a></div>`:'';
+  const rankNote=publicMode?(key==='amount'?'依交易日成交金額排序。':key==='volume'?'依交易日成交股數排序。':'使用該交易日收盤資料。'):rank.note;
   return `<div class="intraday-connection" role="status"><strong>${label}</strong><span>${note}</span>${publicLinks}</div>
-    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||'未設定')}</b></div><div><small>交易狀態</small><b>${label}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div><div><small>${mis?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div></div>
-    <div class="rankings-layout"><nav class="rank-nav" aria-label="盤中排行分類">${Object.entries(INTRADAY_RANKS).map(([id,r])=>`<button type="button" data-intraday-rank="${id}" aria-pressed="${id===key}">${r.label}</button>`).join('')}</nav>
-      <div class="rank-content"><h3>${rank.label}</h3><p class="search-hint">${rank.note}</p>
+    <div class="intraday-meta"><div><small>行情來源</small><b>${escapeHtml(report.source||(publicMode?'臺灣證券交易所':'未設定'))}</b></div><div><small>行情日期</small><b>${escapeHtml(report.snapshot_at?.slice(0,10))}</b></div>${publicMode?'':`<div><small>交易狀態</small><b>${label}</b></div><div><small>${mis?'最新成交時間':'快照時間'}（台灣）</small><b>${quoteTime(report.snapshot_at)}</b></div>`}</div>
+    <div class="rankings-layout"><nav class="rank-nav" aria-label="${publicMode?'盤後':'盤中'}排行分類">${keys.map(id=>`<button type="button" data-intraday-rank="${id}" aria-pressed="${id===key}">${INTRADAY_RANKS[id].label}</button>`).join('')}</nav>
+      <div class="rank-content"><h3>${rank.label}</h3><p class="search-hint">${rankNote}</p>
         ${Number.isFinite(report.universe_count)?`<p class="explore-summary">${watchlist?'自選清單 · ':market?'上市全市場 · ':''}名錄 ${number(report.universe_count)} 檔${Number.isFinite(report.returned_count)?` · 來源回傳 ${number(report.returned_count)} 檔`:''}${usable?` · 有成交資料 ${number(report.coverage)} 檔 · 本分類 ${rows.length} 檔`:''}。</p>`:''}
         ${partial?`<p class="intraday-notice">只取得部分批次（${number(report.batches_ok)}／${number(report.batch_count)}）。排行依本次成功取得的行情計算。</p>`:''}
         ${openingSummary?`<p class="explore-summary">${openingSummary}</p>`:''}
         ${key==='watchlist'?'<p class="intraday-notice">盤中策略尚未啟用，目前不產生買進建議或入場名單。</p>':''}
         <div class="research-table-wrap"><table class="research-table intraday-table"><thead><tr>${columns.map(c=>`<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rowMarkup||`<tr><td colspan="${columns.length}" class="intraday-empty">${empty}</td></tr>`}</tbody></table></div>
         ${pagination}
-        <p class="ranking-footnote">${mis?`${market?'範圍為上市普通股與上市 ETF。':'排名限自選清單。'}漲跌幅以 MIS 回傳的昨收欄位計算，請核對除權息日的參考價。行情時間依各標的回傳時間。`:'涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。'}</p>
+        <p class="ranking-footnote">${publicMode?'涵蓋已發布報告中的上市普通股與股票型原型 ETF。除權息或前一交易日收盤資料缺漏時，漲跌幅留空。':mis?`${market?'範圍為上市普通股與上市 ETF。':'排名限自選清單。'}漲跌幅以 MIS 回傳的昨收欄位計算，請核對除權息日的參考價。行情時間依各標的回傳時間。`:'涵蓋本機清單中的上市普通股與股票型原型 ETF。行情時間為各標的快照時間。參考價無法核對時，對應漲跌幅留空。'}</p>
       </div></div>`;
 }
 
@@ -119,7 +141,8 @@ export function createIntradayView(root,fetchReport,watchlist){
     if(!document.hidden){
       let next;
       try{next=await fetchReport();}
-      catch{next={status:'unavailable'};}
+      catch{next=watchlist?.staticMode&&report?.status==='published'?report:
+        {status:watchlist?.staticMode?'published_error':'unavailable'};}
       if(run!==generation)return;
       report=next;
       if(input&&!initialized&&next.status!=='unavailable'){
@@ -129,7 +152,7 @@ export function createIntradayView(root,fetchReport,watchlist){
       render(Boolean(root.contains(document.activeElement)));
     }
     if(run===generation&&report?.status!=='unconfigured'){
-      timer=setTimeout(()=>refresh(run),15000);
+      timer=setTimeout(()=>refresh(run),watchlist?.staticMode?300000:15000);
     }
   }
   function setActive(visible){
